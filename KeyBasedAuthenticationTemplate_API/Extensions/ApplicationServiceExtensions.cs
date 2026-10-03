@@ -14,6 +14,7 @@ namespace KeyBasedAuthenticationTemplate_API.Extensions
         public static IServiceCollection AddApplicationServices(this IServiceCollection services)
         {
             services.AddScoped<IUserRepository, UserRepository>();
+            services.AddScoped<IRoleRepository, RoleRepository>();
             services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
             services.AddScoped<IProductRepository, ProductRepository>();
 
@@ -21,6 +22,7 @@ namespace KeyBasedAuthenticationTemplate_API.Extensions
             services.AddScoped<IApiKeyService, ApiKeyService>();
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IRoleService, RoleService>();
 
             services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
             services.AddSingleton<IApiKeyGenerator, ApiKeyGenerator>();

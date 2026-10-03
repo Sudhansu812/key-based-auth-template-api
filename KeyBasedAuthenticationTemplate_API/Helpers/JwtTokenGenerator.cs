@@ -22,15 +22,15 @@ namespace KeyBasedAuthenticationTemplate_API.Helpers
         {
             var expiresAtUtc = DateTime.UtcNow.AddMinutes(_settings.ExpiryMinutes);
 
-            var claims = new[]
+            var claims = new List<Claim>
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, user.Role.ToString())
+                new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new(ClaimTypes.Name, user.Username),
+                new(ClaimTypes.Email, user.Email)
             };
+            claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role.Name)));
 
             var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.Secret));
             var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);

@@ -2,10 +2,10 @@
 
 A production-style **.NET 10 Web API template** demonstrating two authentication methods side by side:
 
-- **Username/password login** → short-lived JWT access tokens
-- **User-generated API keys** → long-lived, header-based credentials (shown once, hashed at rest)
+- **Username/password login** → short-lived JWT access tokens, carrying the user's roles
+- **Standalone API keys** → long-lived, header-based service credentials (shown once, hashed at rest, gated only by a `ReadOnly`/`ReadWrite` access level)
 
-Both work interchangeably on the *same* protected endpoints. The template also demonstrates a two-database setup (SQL Server for identity, PostgreSQL for business data), role-based authorization, and a layered architecture meant to be easy to extend for a real project.
+Both work on the *same* protected endpoints, but they are deliberately **not** the same kind of principal: a JWT represents a real user with roles; an API key represents a service credential with no owner and no role at all. The template also demonstrates a two-database setup (SQL Server for identity, PostgreSQL for business data), a dynamic admin-manageable roles system, and a layered architecture meant to be easy to extend for a real project.
 
 This README is a guide: it walks through what the project does, how to get it running locally, and how to use every endpoint.
 
@@ -19,11 +19,12 @@ This README is a guide: it walks through what the project does, how to get it ru
 - [Project structure](#project-structure)
 - [Prerequisites](#prerequisites)
 - [Getting started](#getting-started)
-- [Seeded demo accounts](#seeded-demo-accounts)
+- [Seeded demo data](#seeded-demo-data)
 - [Authentication guide](#authentication-guide)
   - [1. Username/password → JWT](#1-usernamepassword--jwt)
-  - [2. API keys](#2-api-keys)
-  - [3. Calling a protected endpoint with either credential](#3-calling-a-protected-endpoint-with-either-credential)
+  - [2. Roles](#2-roles)
+  - [3. API keys](#3-api-keys)
+  - [4. Calling a protected endpoint with either credential](#4-calling-a-protected-endpoint-with-either-credential)
 - [API reference](#api-reference)
 - [Database & migrations](#database--migrations)
 - [Configuration reference](#configuration-reference)
@@ -39,8 +40,9 @@ This README is a guide: it walks through what the project does, how to get it ru
 | Password storage | `Microsoft.AspNetCore.Identity.PasswordHasher<User>` (PBKDF2) — no external hashing library |
 | API key storage | Only a SHA-256 hash of the key's secret portion is ever stored; the full key is returned **exactly once**, at creation time |
 | Dual authentication | A policy scheme picks JWT Bearer or API key authentication per-request based on which header is present — `[Authorize]` works the same either way |
-| Authorization | Simple `User`/`Admin` roles via `[Authorize(Roles = "Admin")]` |
-| Two databases | SQL Server for `Users`/`ApiKeys`, PostgreSQL for `Products` — no shared foreign keys, ownership enforced in application code |
+| Roles | A real `Roles` table, many-to-many with `User` — admins can define new roles at runtime, not just a fixed enum |
+| API key permissions | Fully decoupled from users — a key has no owner, only an `AccessLevel` (`ReadOnly`/`ReadWrite`), enforced by a `WriteAccess` authorization policy |
+| Two databases | SQL Server for `Users`/`Roles`/`ApiKeys`, PostgreSQL for `Products` — no shared foreign keys, ownership enforced in application code |
 | Layering | Controllers → Services (business logic) → Repositories (EF Core access), wired through DI |
 | Error handling | Typed exceptions mapped to HTTP status codes + `ProblemDetails` bodies by a global exception handler |
 | Secrets | `.env` file (gitignored) + `DotNetEnv`, mirrored into a gitignored `launchSettings.json` for F5 debugging |
@@ -70,8 +72,8 @@ Services/*                ← business logic & authorization decisions (ownershi
 Repository/DB/*           ← EF Core data access only, no business rules
      │
      ▼
-AuthDbContext (SQL Server)   AppDbContext (PostgreSQL)
-   Users, ApiKeys               Products
+AuthDbContext (SQL Server)            AppDbContext (PostgreSQL)
+   Users, Roles, UserRoles, ApiKeys      Products
 ```
 
 Authentication is resolved **before** any of this, by a policy scheme configured in `Extensions/AuthenticationServiceExtensions.cs`:
@@ -81,15 +83,19 @@ Incoming request
      │
      ├─ has "X-Api-Key" header? ──► ApiKeyAuthenticationHandler (custom scheme)
      │                                  validates against ApiKeys table (SQL Server)
+     │                                  → principal has NO role claim, only access_level
      │
      └─ otherwise ─────────────────► JwtBearer scheme
                                         validates the signed JWT from /api/auth/login
+                                        → principal has one role claim per Role the user holds
      │
      ▼
-Same ClaimsPrincipal shape either way → [Authorize] / [Authorize(Roles = "Admin")]
+[Authorize] / [Authorize(Roles = "Admin")] / [Authorize(Policy = "WriteAccess")]
 ```
 
-Because `Product.OwnerUserId` points at a `User.Id` in a *different physical database*, there is no database-level foreign key between them — `ProductService` enforces ownership (or admin bypass) in code instead.
+Because an API key carries no role claim at all, `[Authorize(Roles = "Admin")]` endpoints (`/api/users`, `/api/roles`, `/api/apikeys`) are **unreachable via API key by construction** — no extra checks needed to enforce that.
+
+Because `Product.OwnerUserId` points at a `User.Id` in a *different physical database* (and an API key has no user at all), there is no database-level foreign key between them — `ProductService` enforces ownership (or an admin/API-key bypass) in code instead.
 
 ## Project structure
 
@@ -100,18 +106,20 @@ KeyBasedAuthenticationTemplate_API/            (solution root)
 │   └── .example.env                           ← committed template, copy this to .env
 └── KeyBasedAuthenticationTemplate_API/        (project root)
     ├── Authentication/                        ← custom API key auth scheme
+    ├── Authorization/                         ← WriteAccess policy requirement + handler
     ├── Common/
     │   ├── Exceptions/                        ← ConflictException, NotFoundException, etc.
-    │   └── ClaimsPrincipalExtensions.cs        ← GetUserId() / IsAdmin() helpers
+    │   ├── SystemRoleNames.cs                 ← reserved "Admin"/"User" role name constants
+    │   └── ClaimsPrincipalExtensions.cs        ← GetUserId() / IsAdmin() / IsApiKeyAuthenticated()
     ├── Configuration/                         ← JwtSettings, ApiKeySettings (bound from config)
     ├── Controllers/                           ← thin HTTP endpoints
     ├── Data/
-    │   ├── AuthDbContext.cs                   ← SQL Server: Users, ApiKeys
+    │   ├── AuthDbContext.cs                   ← SQL Server: Users, Roles, UserRoles, ApiKeys
     │   ├── AppDbContext.cs                    ← PostgreSQL: Products
     │   ├── Migrations/AuthDb/ , Migrations/AppDb/
     │   └── Seed/DbInitializer.cs              ← Development-only demo data
     ├── DTOs/                                  ← request/response models, by feature
-    ├── Entities/                              ← User, ApiKey, Product, UserRole
+    ├── Entities/                              ← User, Role, ApiKey, ApiKeyAccessLevel, Product
     ├── ErrorHandling/GlobalExceptionHandler.cs
     ├── Extensions/                            ← DI/auth wiring, keeps Program.cs short
     ├── Helpers/                               ← JwtTokenGenerator, ApiKeyGenerator
@@ -131,7 +139,7 @@ KeyBasedAuthenticationTemplate_API/            (solution root)
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- A local **SQL Server** instance (used for `Users`/`ApiKeys`)
+- A local **SQL Server** instance (used for `Users`/`Roles`/`ApiKeys`)
 - A local **PostgreSQL** instance (used for `Products`)
 - The EF Core CLI tool:
   ```bash
@@ -174,7 +182,7 @@ KeyBasedAuthenticationTemplate_API/            (solution root)
    ```bash
    dotnet run
    ```
-   On first run in Development, `DbInitializer` seeds two demo users and five sample products (see below).
+   On first run in Development, `DbInitializer` seeds the system roles, two demo users, and five sample products (see below).
 
 5. **Open the API docs** — Scalar's UI is served at:
    ```
@@ -182,9 +190,13 @@ KeyBasedAuthenticationTemplate_API/            (solution root)
    ```
    (or `https://localhost:7116/scalar` on the https profile)
 
-## Seeded demo accounts
+## Seeded demo data
 
 Created automatically by `Data/Seed/DbInitializer.cs` the first time you run in Development:
+
+**Roles** (`IsSystemRole = true`): `Admin`, `User`
+
+**Users:**
 
 | Username | Email | Password | Role |
 |---|---|---|---|
@@ -221,9 +233,11 @@ Both return:
   "expiresAtUtc": "2026-10-03T16:51:00Z",
   "userId": "b52f2e9e-acf2-4958-a7c1-6aefeb6bcc22",
   "username": "admin",
-  "role": "Admin"
+  "roles": ["Admin"]
 }
 ```
+
+A new registration always gets the `User` role. The JWT carries one role claim per entry in `roles`.
 
 Use `accessToken` as a Bearer token on subsequent requests:
 
@@ -232,26 +246,57 @@ curl http://localhost:5090/api/products \
   -H "Authorization: Bearer <accessToken>"
 ```
 
-The token expires after `Jwt__ExpiryMinutes` (default 60 minutes) — there is no refresh token flow in this template; log in again once it expires.
+The token expires after `Jwt__ExpiryMinutes` (default 60 minutes) — there is no refresh token flow in this template; log in again once it expires (or after a role change, to pick up the new roles).
 
-### 2. API keys
+### 2. Roles
 
-API keys are generated by an **authenticated** caller (via JWT or an existing API key) and belong to that user. The key has the shape `{prefix}_{keyId}.{secret}` — e.g. `kbat_8f3a1b2c9d4e.Xy7h2K...`.
+Roles are rows in a table, not a fixed enum — an Admin can define new ones at runtime. All role endpoints require the `Admin` role.
+
+**Create a role:**
+
+```bash
+curl -X POST http://localhost:5090/api/roles \
+  -H "Authorization: Bearer <admin-accessToken>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Support"}'
+```
+
+**List roles:**
+
+```bash
+curl http://localhost:5090/api/roles -H "Authorization: Bearer <admin-accessToken>"
+```
+
+**Assign a user's roles** (full replace — the user ends up with exactly this set):
+
+```bash
+curl -X PUT http://localhost:5090/api/users/<user-id>/roles \
+  -H "Authorization: Bearer <admin-accessToken>" \
+  -H "Content-Type: application/json" \
+  -d '{"roleIds": ["<role-id-1>", "<role-id-2>"]}'
+```
+
+The affected user picks up the change the next time they log in (the JWT is only built at login time).
+
+### 3. API keys
+
+Unlike JWTs, an API key is **not tied to any user** — it's a standalone service credential with just a name and an `AccessLevel` (`ReadOnly` or `ReadWrite`). Because of this, **all API key management requires the `Admin` role**:
 
 **Create a key:**
 
 ```bash
 curl -X POST http://localhost:5090/api/apikeys \
-  -H "Authorization: Bearer <accessToken>" \
+  -H "Authorization: Bearer <admin-accessToken>" \
   -H "Content-Type: application/json" \
-  -d '{"name":"My CI pipeline", "expiresInDays": 90}'
+  -d '{"name":"CI pipeline", "accessLevel": "ReadWrite", "expiresInDays": 90}'
 ```
 
 ```json
 {
   "id": "4e27c7e0-74c0-4856-8136-3e902229a2ee",
-  "name": "My CI pipeline",
+  "name": "CI pipeline",
   "fullKey": "kbat_c1c99e627fcf2b48.aRYNQKZtCPMcvB1XN3oK14sZxSn3d3bZvFCtA-BsLCg",
+  "accessLevel": "ReadWrite",
   "createdAtUtc": "2026-10-03T15:51:15Z",
   "expiresAtUtc": "2027-01-01T15:51:15Z"
 }
@@ -259,29 +304,35 @@ curl -X POST http://localhost:5090/api/apikeys \
 
 > ⚠️ **`fullKey` is only ever returned here.** The database only stores a SHA-256 hash of its secret portion — there is no "show key again" endpoint. Save it immediately.
 
-**List your keys** (no secrets included):
+`accessLevel` defaults to `ReadOnly` if omitted. Omit `expiresInDays` (or send `null`) for a key that never expires.
+
+**List all keys** (admin-only, no secrets included):
 
 ```bash
-curl http://localhost:5090/api/apikeys -H "Authorization: Bearer <accessToken>"
+curl http://localhost:5090/api/apikeys -H "Authorization: Bearer <admin-accessToken>"
 ```
 
-**Revoke a key:**
+**Revoke a key** (admin-only):
 
 ```bash
-curl -X DELETE http://localhost:5090/api/apikeys/<id> -H "Authorization: Bearer <accessToken>"
+curl -X DELETE http://localhost:5090/api/apikeys/<id> -H "Authorization: Bearer <admin-accessToken>"
 ```
 
-Omit `expiresInDays` (or send `null`) for a key that never expires.
+**What a key can actually do once issued:**
+- A `ReadOnly` key can call `GET` endpoints only.
+- A `ReadWrite` key can also call `POST`/`PUT`/`DELETE` on endpoints protected by the `WriteAccess` policy (currently just `Products`).
+- Since a key has no owner, it sees/manages **all** `Products` regardless of access level restrictions on reads — a `ReadOnly` key's `GET /api/products` returns every product, not a filtered subset. A product created via a `ReadWrite` key gets `ownerUserId: "00000000-0000-0000-0000-000000000000"` (no attributable owner).
+- A key can **never** reach `Admin`-gated endpoints (`/api/users`, `/api/roles`, `/api/apikeys`), at any access level — it carries no role claim at all.
 
-### 3. Calling a protected endpoint with either credential
+### 4. Calling a protected endpoint with either credential
 
-Once you have a key, it works exactly like a JWT on any protected endpoint — just swap the header:
+Once you have a key, swap the header instead of using `Authorization`:
 
 ```bash
 curl http://localhost:5090/api/products -H "X-Api-Key: kbat_c1c99e627fcf2b48.aRYNQKZtCPMcvB1XN3oK14sZxSn3d3bZvFCtA-BsLCg"
 ```
 
-If both a `Authorization: Bearer` header and an `X-Api-Key` header are absent, you'll get a `401`. If `X-Api-Key` is present, it takes priority over any bearer token on the same request.
+If both an `Authorization: Bearer` header and an `X-Api-Key` header are absent, you'll get a `401`. If `X-Api-Key` is present, it takes priority over any bearer token on the same request.
 
 ## API reference
 
@@ -292,31 +343,41 @@ If both a `Authorization: Bearer` header and an `X-Api-Key` header are absent, y
 | POST | `/api/auth/register` | `{ email, username, password }` | Create a new `User` account (role: `User`), returns a JWT |
 | POST | `/api/auth/login` | `{ usernameOrEmail, password }` | Authenticate, returns a JWT |
 
-### API keys — `/api/apikeys` (requires authentication)
+### Roles — `/api/roles` (requires `Admin` role)
 
 | Method | Path | Body | Description |
 |---|---|---|---|
-| POST | `/api/apikeys` | `{ name, expiresInDays? }` | Create a new API key for the caller; returns the full key **once** |
-| GET | `/api/apikeys` | — | List the caller's own keys (no secrets) |
-| DELETE | `/api/apikeys/{id}` | — | Revoke one of the caller's own keys |
-
-### Products — `/api/products` (requires authentication)
-
-A demo CRUD resource, scoped to the caller unless they're an `Admin`.
-
-| Method | Path | Body | Description |
-|---|---|---|---|
-| GET | `/api/products` | — | List products owned by the caller (all products if `Admin`) |
-| GET | `/api/products/{id}` | — | Get one product (403 if you don't own it and aren't `Admin`) |
-| POST | `/api/products` | `{ name, description?, price, stock }` | Create a product owned by the caller |
-| PUT | `/api/products/{id}` | `{ name, description?, price, stock }` | Update a product you own (or any, as `Admin`) |
-| DELETE | `/api/products/{id}` | — | Delete a product you own (or any, as `Admin`) |
+| POST | `/api/roles` | `{ name }` | Create a new role |
+| GET | `/api/roles` | — | List all roles |
 
 ### Users — `/api/users` (requires `Admin` role)
 
 | Method | Path | Body | Description |
 |---|---|---|---|
-| GET | `/api/users` | — | List all users (id, email, username, role, active, created date — no password hashes) |
+| GET | `/api/users` | — | List all users (id, email, username, roles, active, created date — no password hashes) |
+| PUT | `/api/users/{id}/roles` | `{ roleIds: [] }` | Replace a user's full role set |
+
+### API keys — `/api/apikeys` (requires `Admin` role)
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| POST | `/api/apikeys` | `{ name, accessLevel?, expiresInDays? }` | Create a new standalone API key; returns the full key **once** |
+| GET | `/api/apikeys` | — | List all keys (no secrets) |
+| DELETE | `/api/apikeys/{id}` | — | Revoke any key |
+
+### Products — `/api/products` (requires authentication; JWT or API key)
+
+A demo CRUD resource, scoped to the caller unless they're an `Admin` or authenticated via API key (both get blanket access).
+
+| Method | Path | Body | Auth needed | Description |
+|---|---|---|---|---|
+| GET | `/api/products` | — | Any | List products owned by the caller (all products if `Admin` or API key) |
+| GET | `/api/products/{id}` | — | Any | Get one product (403 if you don't own it and aren't `Admin`/API key) |
+| POST | `/api/products` | `{ name, description?, price, stock }` | `WriteAccess` | Create a product (owner = caller, or `Guid.Empty` for an API key) |
+| PUT | `/api/products/{id}` | `{ name, description?, price, stock }` | `WriteAccess` | Update a product you own (or any, as `Admin`/API key) |
+| DELETE | `/api/products/{id}` | — | `WriteAccess` | Delete a product you own (or any, as `Admin`/API key) |
+
+`WriteAccess` means: any JWT-authenticated user (subject to their own ownership/role checks), or an API key with `AccessLevel: ReadWrite`. A `ReadOnly` key gets `403` on all three.
 
 ## Database & migrations
 
@@ -334,7 +395,7 @@ dotnet ef database update --context AppDbContext
 
 **Naming conventions differ by database**, intentionally:
 
-- **SQL Server** (`AuthDbContext`) — PascalCase tables/columns (`Users`, `ApiKeys`, `PasswordHash`, ...), matching C# property names directly.
+- **SQL Server** (`AuthDbContext`) — PascalCase tables/columns (`Users`, `Roles`, `UserRoles`, `ApiKeys`, ...), matching C# property names directly.
 - **PostgreSQL** (`AppDbContext`) — snake_case tables/columns (`products`, `owner_user_id`, `created_at_utc`, ...), enforced automatically for every property via `EFCore.NamingConventions`' `.UseSnakeCaseNamingConvention()`. Don't add manual `[Column]`/`[Table]` attributes to work around casing — the convention already handles every entity in that context.
 
 ## Configuration reference
@@ -363,11 +424,12 @@ Business-rule failures return [`ProblemDetails`](https://datatracker.ietf.org/do
 { "title": "Invalid credentials.", "status": 401, "instance": "/api/auth/login" }
 ```
 
-`[ApiController]`'s built-in model validation handles malformed request bodies (missing fields, bad email format, etc.) and returns a standard `400` validation-errors payload automatically.
+`[ApiController]`'s built-in model validation handles malformed request bodies (missing fields, bad email format, etc.) and returns a standard `400` validation-errors payload automatically. Enums (like `AccessLevel`) are accepted/returned as their string names (e.g. `"ReadOnly"`), not numbers — a global `JsonStringEnumConverter` is registered in `Program.cs`.
 
 ## Extending this template
 
 - **Add a new field to `Products`**: edit `Entities/Product.cs`, then `dotnet ef migrations add <Name> --context AppDbContext -o Data/Migrations/AppDb` — snake_case naming is applied automatically.
 - **Add a new SQL Server-backed entity**: add it to `Entities/`, register a `DbSet` + Fluent config in `AuthDbContext.OnModelCreating`, then generate a migration with `--context AuthDbContext`.
-- **Add a new role**: extend the `UserRole` enum in `Entities/UserRole.cs` — `[Authorize(Roles = nameof(UserRole.YourRole))]` works immediately, no other wiring needed.
+- **Add a new role**: no code change needed — `POST /api/roles` as an Admin, then assign it via `PUT /api/users/{id}/roles`.
+- **Add a new write-protected endpoint for API keys**: add `[Authorize(Policy = "WriteAccess")]` alongside `[Authorize]` on the mutating action, the same way `ProductsController` does it.
 - **Add a new protected resource**: follow the `Products` pattern — `Entities/` → `Repository/Interfaces` + `Repository/DB` → `Services/Interfaces` + `Services` → `Controllers`, registering the new repository/service in `Extensions/ApplicationServiceExtensions.cs`.

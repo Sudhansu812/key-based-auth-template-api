@@ -28,6 +28,11 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("AccessLevel")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -55,17 +60,37 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
                     b.Property<DateTime?>("RevokedAtUtc")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.HasKey("Id");
 
                     b.HasIndex("KeyId")
                         .IsUnique();
 
-                    b.HasIndex("UserId");
-
                     b.ToTable("ApiKeys", (string)null);
+                });
+
+            modelBuilder.Entity("KeyBasedAuthenticationTemplate_API.Entities.Role", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsSystemRole")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Roles", (string)null);
                 });
 
             modelBuilder.Entity("KeyBasedAuthenticationTemplate_API.Entities.User", b =>
@@ -89,11 +114,6 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -113,20 +133,34 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
                     b.ToTable("Users", (string)null);
                 });
 
-            modelBuilder.Entity("KeyBasedAuthenticationTemplate_API.Entities.ApiKey", b =>
+            modelBuilder.Entity("UserRoles", b =>
                 {
-                    b.HasOne("KeyBasedAuthenticationTemplate_API.Entities.User", "User")
-                        .WithMany("ApiKeys")
-                        .HasForeignKey("UserId")
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("RoleId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserRoles");
+                });
+
+            modelBuilder.Entity("UserRoles", b =>
+                {
+                    b.HasOne("KeyBasedAuthenticationTemplate_API.Entities.Role", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("KeyBasedAuthenticationTemplate_API.Entities.User", b =>
-                {
-                    b.Navigation("ApiKeys");
+                    b.HasOne("KeyBasedAuthenticationTemplate_API.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

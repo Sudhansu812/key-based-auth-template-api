@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using KeyBasedAuthenticationTemplate_API.Data;
 using KeyBasedAuthenticationTemplate_API.Data.Seed;
 using KeyBasedAuthenticationTemplate_API.ErrorHandling;
@@ -32,7 +33,13 @@ namespace KeyBasedAuthenticationTemplate_API
             builder.Host.UseSerilog();
 
             // Add services to the container.
-            builder.Services.AddControllers();
+            // Enums are serialized/deserialized as their string names (e.g. "ReadOnly")
+            // rather than raw numbers - more readable in requests/responses and Scalar docs.
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                });
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi(options =>
             {

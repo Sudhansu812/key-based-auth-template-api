@@ -1,3 +1,4 @@
+using KeyBasedAuthenticationTemplate_API.Common;
 using KeyBasedAuthenticationTemplate_API.Common.Exceptions;
 using KeyBasedAuthenticationTemplate_API.DTOs.Auth;
 using KeyBasedAuthenticationTemplate_API.Entities;
@@ -11,15 +12,18 @@ namespace KeyBasedAuthenticationTemplate_API.Services
     public class AuthService : IAuthService
     {
         private readonly IUserRepository _userRepository;
+        private readonly IRoleRepository _roleRepository;
         private readonly IPasswordHasher<User> _passwordHasher;
         private readonly IJwtTokenGenerator _jwtTokenGenerator;
 
         public AuthService(
             IUserRepository userRepository,
+            IRoleRepository roleRepository,
             IPasswordHasher<User> passwordHasher,
             IJwtTokenGenerator jwtTokenGenerator)
         {
             _userRepository = userRepository;
+            _roleRepository = roleRepository;
             _passwordHasher = passwordHasher;
             _jwtTokenGenerator = jwtTokenGenerator;
         }
@@ -31,14 +35,18 @@ namespace KeyBasedAuthenticationTemplate_API.Services
                 throw new ConflictException("A user with that email or username already exists.");
             }
 
+            var defaultRole = await _roleRepository.GetByNameAsync(SystemRoleNames.User, cancellationToken)
+                ?? throw new InvalidOperationException(
+                    $"The '{SystemRoleNames.User}' system role is not seeded. Ensure DbInitializer has run.");
+
             var user = new User
             {
                 Id = Guid.NewGuid(),
                 Email = request.Email,
                 Username = request.Username,
-                Role = UserRole.User,
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = DateTime.UtcNow,
+                Roles = new List<Role> { defaultRole }
             };
             user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
@@ -74,7 +82,7 @@ namespace KeyBasedAuthenticationTemplate_API.Services
                 ExpiresAtUtc = expiresAtUtc,
                 UserId = user.Id,
                 Username = user.Username,
-                Role = user.Role.ToString()
+                Roles = user.Roles.Select(r => r.Name).ToList()
             };
         }
     }

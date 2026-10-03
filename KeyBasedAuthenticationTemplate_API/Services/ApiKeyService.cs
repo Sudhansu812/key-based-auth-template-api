@@ -25,17 +25,17 @@ namespace KeyBasedAuthenticationTemplate_API.Services
             _apiKeySettings = apiKeySettings.Value;
         }
 
-        public async Task<ApiKeyCreatedResponse> CreateAsync(Guid userId, CreateApiKeyRequest request, CancellationToken cancellationToken = default)
+        public async Task<ApiKeyCreatedResponse> CreateAsync(CreateApiKeyRequest request, CancellationToken cancellationToken = default)
         {
             var generated = _apiKeyGenerator.Generate(_apiKeySettings.Prefix);
 
             var apiKey = new ApiKey
             {
                 Id = Guid.NewGuid(),
-                UserId = userId,
                 Name = request.Name,
                 KeyId = generated.KeyId,
                 KeyHash = generated.KeyHash,
+                AccessLevel = request.AccessLevel,
                 CreatedAtUtc = DateTime.UtcNow,
                 ExpiresAtUtc = request.ExpiresInDays.HasValue
                     ? DateTime.UtcNow.AddDays(request.ExpiresInDays.Value)
@@ -50,19 +50,21 @@ namespace KeyBasedAuthenticationTemplate_API.Services
                 Id = apiKey.Id,
                 Name = apiKey.Name,
                 FullKey = generated.FullKey,
+                AccessLevel = apiKey.AccessLevel.ToString(),
                 CreatedAtUtc = apiKey.CreatedAtUtc,
                 ExpiresAtUtc = apiKey.ExpiresAtUtc
             };
         }
 
-        public async Task<List<ApiKeySummaryResponse>> GetForUserAsync(Guid userId, CancellationToken cancellationToken = default)
+        public async Task<List<ApiKeySummaryResponse>> GetAllAsync(CancellationToken cancellationToken = default)
         {
-            var keys = await _apiKeyRepository.GetByUserIdAsync(userId, cancellationToken);
+            var keys = await _apiKeyRepository.GetAllAsync(cancellationToken);
             return keys.Select(k => new ApiKeySummaryResponse
             {
                 Id = k.Id,
                 Name = k.Name,
                 KeyId = k.KeyId,
+                AccessLevel = k.AccessLevel.ToString(),
                 CreatedAtUtc = k.CreatedAtUtc,
                 ExpiresAtUtc = k.ExpiresAtUtc,
                 RevokedAtUtc = k.RevokedAtUtc,
@@ -70,9 +72,9 @@ namespace KeyBasedAuthenticationTemplate_API.Services
             }).ToList();
         }
 
-        public async Task RevokeAsync(Guid userId, Guid apiKeyId, CancellationToken cancellationToken = default)
+        public async Task RevokeAsync(Guid apiKeyId, CancellationToken cancellationToken = default)
         {
-            var apiKey = await _apiKeyRepository.GetByIdAndUserIdAsync(apiKeyId, userId, cancellationToken)
+            var apiKey = await _apiKeyRepository.GetByIdAsync(apiKeyId, cancellationToken)
                 ?? throw new NotFoundException("API key not found.");
 
             if (apiKey.RevokedAtUtc is null)

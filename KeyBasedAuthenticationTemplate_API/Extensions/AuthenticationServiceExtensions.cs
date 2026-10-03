@@ -1,7 +1,9 @@
 using System.Text;
 using KeyBasedAuthenticationTemplate_API.Authentication;
+using KeyBasedAuthenticationTemplate_API.Authorization;
 using KeyBasedAuthenticationTemplate_API.Configuration;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 
 namespace KeyBasedAuthenticationTemplate_API.Extensions
@@ -45,7 +47,11 @@ namespace KeyBasedAuthenticationTemplate_API.Extensions
             })
             .AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(ApiKeyAuthenticationOptions.SchemeName, _ => { });
 
-            services.AddAuthorization();
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy("WriteAccess", policy => policy.Requirements.Add(new WriteAccessRequirement()));
+            });
+            services.AddSingleton<IAuthorizationHandler, WriteAccessAuthorizationHandler>();
 
             return services;
         }

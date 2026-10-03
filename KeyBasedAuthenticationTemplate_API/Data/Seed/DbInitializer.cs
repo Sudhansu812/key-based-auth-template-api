@@ -1,3 +1,4 @@
+using KeyBasedAuthenticationTemplate_API.Common;
 using KeyBasedAuthenticationTemplate_API.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,22 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Seed
             await authContext.Database.MigrateAsync();
             await appContext.Database.MigrateAsync();
 
+            var adminRole = await authContext.Roles.FirstOrDefaultAsync(r => r.Name == SystemRoleNames.Admin);
+            if (adminRole is null)
+            {
+                adminRole = new Role { Id = Guid.NewGuid(), Name = SystemRoleNames.Admin, IsSystemRole = true, CreatedAtUtc = DateTime.UtcNow };
+                authContext.Roles.Add(adminRole);
+            }
+
+            var userRole = await authContext.Roles.FirstOrDefaultAsync(r => r.Name == SystemRoleNames.User);
+            if (userRole is null)
+            {
+                userRole = new Role { Id = Guid.NewGuid(), Name = SystemRoleNames.User, IsSystemRole = true, CreatedAtUtc = DateTime.UtcNow };
+                authContext.Roles.Add(userRole);
+            }
+
+            await authContext.SaveChangesAsync();
+
             var admin = await authContext.Users.FirstOrDefaultAsync(u => u.Username == "admin");
             if (admin is null)
             {
@@ -29,9 +46,9 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Seed
                     Id = Guid.NewGuid(),
                     Email = "admin@example.com",
                     Username = "admin",
-                    Role = UserRole.Admin,
                     IsActive = true,
-                    CreatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = DateTime.UtcNow,
+                    Roles = new List<Role> { adminRole }
                 };
                 admin.PasswordHash = passwordHasher.HashPassword(admin, SeedAdminPassword);
                 authContext.Users.Add(admin);
@@ -45,9 +62,9 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Seed
                     Id = Guid.NewGuid(),
                     Email = "user@example.com",
                     Username = "user",
-                    Role = UserRole.User,
                     IsActive = true,
-                    CreatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = DateTime.UtcNow,
+                    Roles = new List<Role> { userRole }
                 };
                 regularUser.PasswordHash = passwordHasher.HashPassword(regularUser, SeedUserPassword);
                 authContext.Users.Add(regularUser);

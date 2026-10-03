@@ -15,10 +15,10 @@ namespace KeyBasedAuthenticationTemplate_API.Repository.DB
         }
 
         public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-            _context.Users.FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+            _context.Users.Include(u => u.Roles).FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
 
         public Task<User?> GetByUsernameOrEmailAsync(string usernameOrEmail, CancellationToken cancellationToken = default) =>
-            _context.Users.FirstOrDefaultAsync(
+            _context.Users.Include(u => u.Roles).FirstOrDefaultAsync(
                 u => u.Username == usernameOrEmail || u.Email == usernameOrEmail,
                 cancellationToken);
 
@@ -26,7 +26,7 @@ namespace KeyBasedAuthenticationTemplate_API.Repository.DB
             _context.Users.AnyAsync(u => u.Email == email || u.Username == username, cancellationToken);
 
         public Task<List<User>> GetAllAsync(CancellationToken cancellationToken = default) =>
-            _context.Users.AsNoTracking().OrderBy(u => u.CreatedAtUtc).ToListAsync(cancellationToken);
+            _context.Users.AsNoTracking().Include(u => u.Roles).OrderBy(u => u.CreatedAtUtc).ToListAsync(cancellationToken);
 
         public async Task AddAsync(User user, CancellationToken cancellationToken = default) =>
             await _context.Users.AddAsync(user, cancellationToken);

@@ -15,18 +15,18 @@ namespace KeyBasedAuthenticationTemplate_API.Services
             _productRepository = productRepository;
         }
 
-        public async Task<List<ProductResponse>> GetAccessibleAsync(Guid userId, bool isAdmin, CancellationToken cancellationToken = default)
+        public async Task<List<ProductResponse>> GetAccessibleAsync(Guid userId, bool bypassOwnership, CancellationToken cancellationToken = default)
         {
-            var products = isAdmin
+            var products = bypassOwnership
                 ? await _productRepository.GetAllAsync(cancellationToken)
                 : await _productRepository.GetByOwnerAsync(userId, cancellationToken);
 
             return products.Select(ToResponse).ToList();
         }
 
-        public async Task<ProductResponse> GetByIdAsync(Guid id, Guid userId, bool isAdmin, CancellationToken cancellationToken = default)
+        public async Task<ProductResponse> GetByIdAsync(Guid id, Guid userId, bool bypassOwnership, CancellationToken cancellationToken = default)
         {
-            var product = await GetOwnedOrThrowAsync(id, userId, isAdmin, cancellationToken);
+            var product = await GetOwnedOrThrowAsync(id, userId, bypassOwnership, cancellationToken);
             return ToResponse(product);
         }
 
@@ -49,9 +49,9 @@ namespace KeyBasedAuthenticationTemplate_API.Services
             return ToResponse(product);
         }
 
-        public async Task<ProductResponse> UpdateAsync(Guid id, Guid userId, bool isAdmin, ProductRequest request, CancellationToken cancellationToken = default)
+        public async Task<ProductResponse> UpdateAsync(Guid id, Guid userId, bool bypassOwnership, ProductRequest request, CancellationToken cancellationToken = default)
         {
-            var product = await GetOwnedOrThrowAsync(id, userId, isAdmin, cancellationToken);
+            var product = await GetOwnedOrThrowAsync(id, userId, bypassOwnership, cancellationToken);
 
             product.Name = request.Name;
             product.Description = request.Description;
@@ -64,19 +64,19 @@ namespace KeyBasedAuthenticationTemplate_API.Services
             return ToResponse(product);
         }
 
-        public async Task DeleteAsync(Guid id, Guid userId, bool isAdmin, CancellationToken cancellationToken = default)
+        public async Task DeleteAsync(Guid id, Guid userId, bool bypassOwnership, CancellationToken cancellationToken = default)
         {
-            var product = await GetOwnedOrThrowAsync(id, userId, isAdmin, cancellationToken);
+            var product = await GetOwnedOrThrowAsync(id, userId, bypassOwnership, cancellationToken);
             _productRepository.Remove(product);
             await _productRepository.SaveChangesAsync(cancellationToken);
         }
 
-        private async Task<Product> GetOwnedOrThrowAsync(Guid id, Guid userId, bool isAdmin, CancellationToken cancellationToken)
+        private async Task<Product> GetOwnedOrThrowAsync(Guid id, Guid userId, bool bypassOwnership, CancellationToken cancellationToken)
         {
             var product = await _productRepository.GetByIdAsync(id, cancellationToken)
                 ?? throw new NotFoundException("Product not found.");
 
-            if (!isAdmin && product.OwnerUserId != userId)
+            if (!bypassOwnership && product.OwnerUserId != userId)
             {
                 throw new ForbiddenException("You do not have access to this product.");
             }

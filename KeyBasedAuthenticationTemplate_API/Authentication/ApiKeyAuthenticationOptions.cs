@@ -6,5 +6,6 @@ namespace KeyBasedAuthenticationTemplate_API.Authentication
     {
         public const string SchemeName = "ApiKey";
         public const string HeaderName = "X-Api-Key";
+        public const string AccessLevelClaimType = "access_level";
     }
 }

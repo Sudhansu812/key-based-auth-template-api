@@ -57,20 +57,17 @@ namespace KeyBasedAuthenticationTemplate_API.Authentication
                 return AuthenticateResult.Fail("API key has expired.");
             }
 
-            if (!apiKey.User.IsActive)
-            {
-                return AuthenticateResult.Fail("User account is inactive.");
-            }
-
             apiKey.LastUsedAtUtc = DateTime.UtcNow;
             await _apiKeyRepository.SaveChangesAsync();
 
+            // An API key is a standalone credential - it has no owning user, and
+            // deliberately carries no role claim, so it can never reach an
+            // [Authorize(Roles = ...)] endpoint regardless of access level.
             var claims = new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, apiKey.User.Id.ToString()),
-                new Claim(ClaimTypes.Name, apiKey.User.Username),
-                new Claim(ClaimTypes.Email, apiKey.User.Email),
-                new Claim(ClaimTypes.Role, apiKey.User.Role.ToString())
+                new Claim(ClaimTypes.NameIdentifier, apiKey.Id.ToString()),
+                new Claim(ClaimTypes.Name, apiKey.Name),
+                new Claim(ApiKeyAuthenticationOptions.AccessLevelClaimType, apiKey.AccessLevel.ToString())
             };
 
             var identity = new ClaimsIdentity(claims, Scheme.Name);
