@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5090",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ConnectionStrings__AuthDb": "Server=localhost,1433;Database=AuthDb;User Id=sa;Password=changeme;TrustServerCertificate=True;",
+        "ConnectionStrings__AppDb": "Host=localhost;Port=5432;Database=AppDb;Username=postgres;Password=changeme",
+        "Jwt__Secret": "replace-with-a-long-random-secret-at-least-32-characters",
+        "Jwt__Issuer": "KeyBasedAuthenticationTemplate",
+        "Jwt__Audience": "KeyBasedAuthenticationTemplate.Client",
+        "Jwt__ExpiryMinutes": "60",
+        "ApiKey__Prefix": "kbat"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:7116;http://localhost:5090",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ConnectionStrings__AuthDb": "Server=localhost,1433;Database=AuthDb;User Id=sa;Password=changeme;TrustServerCertificate=True;",
+        "ConnectionStrings__AppDb": "Host=localhost;Port=5432;Database=AppDb;Username=postgres;Password=changeme",
+        "Jwt__Secret": "replace-with-a-long-random-secret-at-least-32-characters",
+        "Jwt__Issuer": "KeyBasedAuthenticationTemplate",
+        "Jwt__Audience": "KeyBasedAuthenticationTemplate.Client",
+        "Jwt__ExpiryMinutes": "60",
+        "ApiKey__Prefix": "kbat"
+      }
+    }
+  }
+}

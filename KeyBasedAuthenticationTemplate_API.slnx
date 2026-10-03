@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/env/">
+    <File Path="env/.env" />
+  </Folder>
+  <Project Path="KeyBasedAuthenticationTemplate_API/KeyBasedAuthenticationTemplate_API.csproj" />
+</Solution>
