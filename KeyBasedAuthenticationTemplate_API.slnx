@@ -1,6 +1,10 @@
 <Solution>
   <Folder Name="/env/">
     <File Path="env/.env" />
+    <File Path="env/.example.env" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
   </Folder>
   <Project Path="KeyBasedAuthenticationTemplate_API/KeyBasedAuthenticationTemplate_API.csproj" />
 </Solution>

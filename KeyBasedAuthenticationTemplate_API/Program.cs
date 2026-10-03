@@ -39,10 +39,15 @@ namespace KeyBasedAuthenticationTemplate_API
                 options.AddDocumentTransformer<SecuritySchemeTransformer>();
             });
 
+            // SQL Server convention is PascalCase (matches C# property names as-is).
             builder.Services.AddDbContext<AuthDbContext>(options =>
                 options.UseSqlServer(builder.Configuration.GetConnectionString("AuthDb")));
+
+            // PostgreSQL convention is snake_case; EFCore.NamingConventions converts
+            // every table/column name for this context automatically.
             builder.Services.AddDbContext<AppDbContext>(options =>
-                options.UseNpgsql(builder.Configuration.GetConnectionString("AppDb")));
+                options.UseNpgsql(builder.Configuration.GetConnectionString("AppDb"))
+                    .UseSnakeCaseNamingConvention());
 
             builder.Services.AddCustomAuthentication(builder.Configuration);
             builder.Services.AddApplicationServices();
