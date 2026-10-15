@@ -1,5 +1,6 @@
 using KeyBasedAuthenticationTemplate_API.Common;
 using KeyBasedAuthenticationTemplate_API.DTOs.Products;
+using KeyBasedAuthenticationTemplate_Contracts.Products;
 using KeyBasedAuthenticationTemplate_API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

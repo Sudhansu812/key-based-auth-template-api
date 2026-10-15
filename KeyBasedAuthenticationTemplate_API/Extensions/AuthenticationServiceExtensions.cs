@@ -50,8 +50,10 @@ namespace KeyBasedAuthenticationTemplate_API.Extensions
             services.AddAuthorization(options =>
             {
                 options.AddPolicy("WriteAccess", policy => policy.Requirements.Add(new WriteAccessRequirement()));
+                options.AddPolicy(ReportAccessRequirement.PolicyName, policy => policy.Requirements.Add(new ReportAccessRequirement()));
             });
             services.AddSingleton<IAuthorizationHandler, WriteAccessAuthorizationHandler>();
+            services.AddSingleton<IAuthorizationHandler, ReportAccessAuthorizationHandler>();
 
             return services;
         }

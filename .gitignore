@@ -391,6 +391,9 @@ env/*
 # Secrets - launchSettings.json mirrors env/.env for F5 debugging; keep only the example tracked
 **/Properties/launchSettings.json
 
+# Generated Excel reports from the Automation project (logs/ is already ignored above)
+**/reports-output/
+
 # Claude Code - machine-local permission/session state (not shared project config)
 .claude/settings.local.json
 

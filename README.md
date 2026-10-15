@@ -53,7 +53,9 @@ This README is a guide: it walks through what the project does, how to get it ru
 - **Entity Framework Core 10** — `Microsoft.EntityFrameworkCore.SqlServer` + `Npgsql.EntityFrameworkCore.PostgreSQL`
 - **EFCore.NamingConventions** — enforces snake_case naming on the PostgreSQL side
 - **JWT Bearer authentication** — `Microsoft.AspNetCore.Authentication.JwtBearer`
-- **Serilog** — structured console logging
+- **Dapper** — raw-SQL read path for the report endpoints (alongside EF Core)
+- **Serilog** — structured console logging (API) and structured JSON file logging (Automation)
+- **ClosedXML** — Excel (.xlsx) generation in the Automation project
 - **Scalar** — interactive OpenAPI documentation UI (not Swagger UI)
 - **DotNetEnv** — loads `.env` into configuration at startup
 
@@ -95,6 +97,8 @@ Incoming request
 
 Because an API key carries no role claim at all, `[Authorize(Roles = "Admin")]` endpoints (`/api/users`, `/api/roles`, `/api/apikeys`) are **unreachable via API key by construction** — no extra checks needed to enforce that.
 
+The `/api/reports/*` and `/api/notifications/*` endpoints use a `ReportAccess` policy instead (API key **or** Admin), so they are reachable by API key while the Admin-only endpoints above stay closed to keys. Reports are read through either EF Core (`Repository/DB`) or Dapper (`Repository/DapperDB`, via `Data/IDbConnectionFactory`) — same databases, same DTOs.
+
 Because `Product.OwnerUserId` points at a `User.Id` in a *different physical database* (and an API key has no user at all), there is no database-level foreign key between them — `ProductService` enforces ownership (or an admin/API-key bypass) in code instead.
 
 ## Project structure
@@ -104,9 +108,11 @@ KeyBasedAuthenticationTemplate_API/            (solution root)
 ├── env/
 │   ├── .env                                   ← your real secrets (gitignored)
 │   └── .example.env                           ← committed template, copy this to .env
+├── KeyBasedAuthenticationTemplate_Contracts/  ← DTOs/constants shared by API and Automation
+├── KeyBasedAuthenticationTemplate_Automation/ ← report job: API → Excel → mock email (see "Automation")
 └── KeyBasedAuthenticationTemplate_API/        (project root)
     ├── Authentication/                        ← custom API key auth scheme
-    ├── Authorization/                         ← WriteAccess policy requirement + handler
+    ├── Authorization/                         ← WriteAccess + ReportAccess policy requirements/handlers
     ├── Common/
     │   ├── Exceptions/                        ← ConflictException, NotFoundException, etc.
     │   ├── SystemRoleNames.cs                 ← reserved "Admin"/"User" role name constants
@@ -126,7 +132,9 @@ KeyBasedAuthenticationTemplate_API/            (solution root)
     ├── OpenApi/SecuritySchemeTransformer.cs   ← registers Bearer + ApiKey schemes for Scalar
     ├── Repository/
     │   ├── Interfaces/
-    │   └── DB/                                ← EF Core-backed repository implementations
+    │   ├── DB/                                ← EF Core-backed repository implementations
+    │   └── DapperDB/                          ← Dapper-backed (raw SQL) report repositories
+    ├── Sql/                                   ← raw queries as .sql files (Postgres/, SqlServer/), embedded in the dll
     ├── Services/
     │   ├── Interfaces/
     │   └── *.cs                               ← business logic
@@ -378,6 +386,88 @@ A demo CRUD resource, scoped to the caller unless they're an `Admin` or authenti
 | DELETE | `/api/products/{id}` | — | `WriteAccess` | Delete a product you own (or any, as `Admin`/API key) |
 
 `WriteAccess` means: any JWT-authenticated user (subject to their own ownership/role checks), or an API key with `AccessLevel: ReadWrite`. A `ReadOnly` key gets `403` on all three.
+
+### Reports — `/api/reports` (requires an API key or the `Admin` role)
+
+Read-only report data for the Automation project. Guarded by the `ReportAccess` policy: API keys (any access level) and Admin JWTs pass; regular `User` JWTs get `403`. `ef` endpoints read through EF Core, `dapper` endpoints return the same data through raw Dapper SQL. (Products via EF is the existing `GET /api/products`.)
+
+| Method | Path | Tech / database | Description |
+|---|---|---|---|
+| GET | `/api/reports/ef/users` | EF Core / SQL Server | All users with their roles (same as `/api/users`, but reachable by API key) |
+| GET | `/api/reports/dapper/products` | Dapper / PostgreSQL | All products (same data as `GET /api/products` for a key) |
+| GET | `/api/reports/dapper/users` | Dapper / SQL Server | All users with their roles |
+
+### Notifications — `/api/notifications` (requires `ReportAccess` **and** `WriteAccess`)
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| POST | `/api/notifications/email` | `{ to[], subject, body, isHtml?, attachments?[{ fileName, contentType, contentBase64 }] }` | **Mock** email: validates and logs the message (recipients, subject, attachment names/sizes — never contents), sends nothing, returns `202` with a `messageId`. Swap `MockEmailService` for a real `IEmailService` to deliver mail. Requires a `ReadWrite` key. |
+
+### Staging — `/api/staging` (requires `ReportAccess` **and** `WriteAccess`)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/staging/product-risk-summary` | Groups `products` (PostgreSQL, Dapper) by cost band × stock band into risk levels, then replaces the contents of `stg.ProductRiskSummary` (SQL Server) in one transaction: `TRUNCATE` + a streamed `SqlBulkCopy` (the PostgreSQL reader feeds the bulk copy directly, nothing is buffered in memory). Returns `{ table, rowsLoaded, snapshotAtUtc }`. Requires a `ReadWrite` key. |
+
+"High" cost/stock means price ≥ 250 / stock ≥ 250 (constants in `ProductDapperRepository`). The staging table is **not** managed by EF migrations — create it once in the `AuthDb` database:
+
+```sql
+CREATE SCHEMA stg;
+GO
+CREATE TABLE stg.ProductRiskSummary (
+    SnapshotAtUtc  DATETIME2(0)  NOT NULL CONSTRAINT DF_stg_ProductRiskSummary_SnapshotAtUtc DEFAULT SYSUTCDATETIME(),
+    RiskLevel      NVARCHAR(64)  NOT NULL,
+    CostBand       NVARCHAR(16)  NOT NULL,
+    StockBand      NVARCHAR(16)  NOT NULL,
+    ProductCount   INT           NOT NULL,
+    TotalUnits     BIGINT        NOT NULL,
+    InventoryValue DECIMAL(18,2) NOT NULL
+);
+```
+
+## Automation (report generation)
+
+`KeyBasedAuthenticationTemplate_Automation` is a one-shot console job that exercises the API with an API key:
+
+```
+Automation ──(X-Api-Key)──► API reports ──► Excel (.xlsx) ──► POST /api/notifications/email (mock)
+```
+
+Depending on the mode (below) it first refreshes the SQL Server staging table, then generates four reports — `products-ef`, `users-ef`, `products-dapper`, `users-dapper` — saves each to `Automation__ReportOutputDirectory`, and sends one digest email with all files attached. A failing report is logged and skipped, and any failure sends an error-notification email to `Automation__ErrorNotificationRecipients`. Exit code: `0` all good, `1` at least one report/email failed, `2` bad configuration or crash.
+
+**Setup**
+
+1. Start the API, log in as an Admin, and create a **ReadWrite** key (`POST /api/apikeys`) — ReadWrite is needed because sending the mock email is a `POST`.
+2. Add the Automation settings from `env/.example.env` to `env/.env` (gitignored) — at minimum `Automation__ApiBaseUrl` and `Automation__ApiKey`. The Automation project finds `env/.env` by walking up from the working directory; real environment variables take precedence.
+3. Run it (API must be running). The optional argument picks the mode:
+   ```bash
+   dotnet run --project KeyBasedAuthenticationTemplate_Automation                      # same as "reports"
+   dotnet run --project KeyBasedAuthenticationTemplate_Automation -- reports            # reports only
+   dotnet run --project KeyBasedAuthenticationTemplate_Automation -- stage-and-reports  # refresh staging, then reports
+   ```
+   In `stage-and-reports` mode a staging failure is logged, triggers the error email, and stops the run before any report is generated (exit code `1`). An unknown argument prints usage and exits `2`.
+
+   Schedule it with Windows Task Scheduler / cron / CI — there is no in-process scheduler.
+
+**Logs** are written as structured JSON, one file per day, to `Automation__LogDirectory` (`automation-YYYYMMDD.log`, 30 days kept): every API call (method, path, status, elapsed), each generated report, emails, and failures with exceptions. The API key is never logged.
+
+| Variable | Example | Purpose |
+|---|---|---|
+| `Automation__ApiBaseUrl` | `http://localhost:5090` | API to call |
+| `Automation__ApiKey` | `kbat_<keyId>.<secret>` | **Secret** — the ReadWrite API key |
+| `Automation__ApiTimeoutSeconds` | `60` | Per-call HTTP timeout (the staging call runs a query plus a bulk load, so it can take longer than a report call) |
+| `Database__CommandTimeoutSeconds` (API) | `60` | Dapper command timeout (reads, TRUNCATE) |
+| `Database__BulkCopyTimeoutSeconds` (API) | `60` | `SqlBulkCopy` timeout — covers the whole streamed load, so it includes time spent waiting on a slow source query |
+| `Automation__ReportOutputDirectory` | `reports-output` | Where `.xlsx` files are saved |
+| `Automation__LogDirectory` | `logs` | Where JSON logs are written |
+| `Automation__ReportRecipients__0` | `reports@example.com` | Digest email recipients (indexed array) |
+| `Automation__ErrorNotificationRecipients__0` | `ops-alerts@example.com` | Failure email recipients (indexed array) |
+
+Shared request/response models used by both the API and Automation (`ProductResponse`, `UserSummaryResponse`, the email DTOs, the `X-Api-Key` header name) live in `KeyBasedAuthenticationTemplate_Contracts`.
+
+### Raw SQL files and parameters
+
+Dapper/ADO.NET queries live in `Sql/<Postgres|SqlServer>/*.sql`, compiled in as embedded resources and loaded by `Data/SqlQueries.Load("Postgres.ProductsAll")`. Each report query carries a `WHERE 1 = 1 OR (...)` demo clause: always true, so it never changes results, but every parameter is bound with an explicit type — Dapper `DynamicParameters`/`DbString` in `ProductDapperRepository.GetAllAsync` and `UserDapperRepository`, and typed `NpgsqlParameter`s in plain ADO.NET in `ProductDapperRepository.StreamRiskSummaryAsync`. Remove the clause when you add real filters. Values are never concatenated into the SQL text.
 
 ## Database & migrations
 

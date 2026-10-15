@@ -1,6 +1,8 @@
+using KeyBasedAuthenticationTemplate_API.Data;
 using KeyBasedAuthenticationTemplate_API.Entities;
 using KeyBasedAuthenticationTemplate_API.Helpers;
 using KeyBasedAuthenticationTemplate_API.Helpers.Interfaces;
+using KeyBasedAuthenticationTemplate_API.Repository.DapperDB;
 using KeyBasedAuthenticationTemplate_API.Repository.DB;
 using KeyBasedAuthenticationTemplate_API.Repository.Interfaces;
 using KeyBasedAuthenticationTemplate_API.Services;
@@ -18,7 +20,16 @@ namespace KeyBasedAuthenticationTemplate_API.Extensions
             services.AddScoped<IApiKeyRepository, ApiKeyRepository>();
             services.AddScoped<IProductRepository, ProductRepository>();
 
+            // Dapper read path (same databases as the EF Core contexts).
+            services.AddSingleton<IDbConnectionFactory, DbConnectionFactory>();
+            services.AddScoped<IProductDapperRepository, ProductDapperRepository>();
+            services.AddScoped<IUserDapperRepository, UserDapperRepository>();
+            services.AddScoped<IProductRiskStagingRepository, ProductRiskStagingRepository>();
+
             services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<IReportService, ReportService>();
+            services.AddScoped<IStagingService, StagingService>();
+            services.AddScoped<IEmailService, MockEmailService>();
             services.AddScoped<IApiKeyService, ApiKeyService>();
             services.AddScoped<IProductService, ProductService>();
             services.AddScoped<IUserService, UserService>();
