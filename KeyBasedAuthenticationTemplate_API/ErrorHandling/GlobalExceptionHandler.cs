@@ -17,6 +17,7 @@ namespace KeyBasedAuthenticationTemplate_API.ErrorHandling
         {
             var (statusCode, title) = exception switch
             {
+                BadRequestException => (StatusCodes.Status400BadRequest, exception.Message),
                 ConflictException => (StatusCodes.Status409Conflict, exception.Message),
                 NotFoundException => (StatusCodes.Status404NotFound, exception.Message),
                 UnauthorizedAppException => (StatusCodes.Status401Unauthorized, exception.Message),

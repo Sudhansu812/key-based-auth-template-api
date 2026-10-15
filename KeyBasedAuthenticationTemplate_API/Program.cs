@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using KeyBasedAuthenticationTemplate_API.Configuration;
 using KeyBasedAuthenticationTemplate_API.Data;
 using KeyBasedAuthenticationTemplate_API.Data.Seed;
 using KeyBasedAuthenticationTemplate_API.ErrorHandling;
@@ -55,6 +56,11 @@ namespace KeyBasedAuthenticationTemplate_API
             builder.Services.AddDbContext<AppDbContext>(options =>
                 options.UseNpgsql(builder.Configuration.GetConnectionString("AppDb"))
                     .UseSnakeCaseNamingConvention());
+
+            builder.Services.AddOptions<DatabaseSettings>()
+                .Bind(builder.Configuration.GetSection(DatabaseSettings.SectionName))
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
 
             builder.Services.AddCustomAuthentication(builder.Configuration);
             builder.Services.AddApplicationServices();

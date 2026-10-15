@@ -1,4 +1,5 @@
 using KeyBasedAuthenticationTemplate_API.DTOs.Products;
+using KeyBasedAuthenticationTemplate_Contracts.Products;
 
 namespace KeyBasedAuthenticationTemplate_API.Services.Interfaces
 {

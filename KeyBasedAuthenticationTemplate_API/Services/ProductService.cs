@@ -1,5 +1,6 @@
 using KeyBasedAuthenticationTemplate_API.Common.Exceptions;
 using KeyBasedAuthenticationTemplate_API.DTOs.Products;
+using KeyBasedAuthenticationTemplate_Contracts.Products;
 using KeyBasedAuthenticationTemplate_API.Entities;
 using KeyBasedAuthenticationTemplate_API.Repository.Interfaces;
 using KeyBasedAuthenticationTemplate_API.Services.Interfaces;

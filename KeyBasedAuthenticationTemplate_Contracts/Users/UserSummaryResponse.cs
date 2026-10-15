@@ -1,4 +1,4 @@
-namespace KeyBasedAuthenticationTemplate_API.DTOs.Users
+namespace KeyBasedAuthenticationTemplate_Contracts.Users
 {
     public class UserSummaryResponse
     {

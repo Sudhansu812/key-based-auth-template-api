@@ -7,4 +7,6 @@
     <File Path=".gitignore" />
   </Folder>
   <Project Path="KeyBasedAuthenticationTemplate_API/KeyBasedAuthenticationTemplate_API.csproj" />
+  <Project Path="KeyBasedAuthenticationTemplate_Automation/KeyBasedAuthenticationTemplate_Automation.csproj" />
+  <Project Path="KeyBasedAuthenticationTemplate_Contracts/KeyBasedAuthenticationTemplate_Contracts.csproj" />
 </Solution>

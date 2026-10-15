@@ -1,4 +1,4 @@
-namespace KeyBasedAuthenticationTemplate_API.DTOs.Products
+namespace KeyBasedAuthenticationTemplate_Contracts.Products
 {
     public class ProductResponse
     {
