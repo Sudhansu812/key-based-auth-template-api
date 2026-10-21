@@ -5,6 +5,9 @@ namespace KeyBasedAuthenticationTemplate_Automation.Reports
         // Short, file-name-safe identifier, e.g. "products-ef".
         string Name { get; }
 
+        // From configuration; a disabled report is skipped.
+        bool Enabled { get; }
+
         Task<GeneratedReport> GenerateAsync(CancellationToken cancellationToken = default);
     }
 

@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
+using KeyBasedAuthenticationTemplate_Automation.Configuration;
 using KeyBasedAuthenticationTemplate_Contracts.Notifications;
 using KeyBasedAuthenticationTemplate_Contracts.Staging;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace KeyBasedAuthenticationTemplate_Automation.Api
 {
@@ -11,16 +13,14 @@ namespace KeyBasedAuthenticationTemplate_Automation.Api
     // where the client is registered (Program.cs), so this class never touches the secret.
     public class ReportApiClient : IReportApiClient
     {
-        private const string EmailPath = "api/notifications/email";
-        private const string StagingPath = "api/staging/product-risk-summary";
-        private const int MaxErrorDetailLength = 300;
-
         private readonly HttpClient _httpClient;
+        private readonly ApiOptions _options;
         private readonly ILogger<ReportApiClient> _logger;
 
-        public ReportApiClient(HttpClient httpClient, ILogger<ReportApiClient> logger)
+        public ReportApiClient(HttpClient httpClient, IOptions<AutomationOptions> options, ILogger<ReportApiClient> logger)
         {
             _httpClient = httpClient;
+            _options = options.Value.Api;
             _logger = logger;
         }
 
@@ -33,21 +33,21 @@ namespace KeyBasedAuthenticationTemplate_Automation.Api
 
         public async Task<SendEmailResponse> SendEmailAsync(SendEmailRequest request, CancellationToken cancellationToken = default)
         {
-            using var message = new HttpRequestMessage(HttpMethod.Post, EmailPath)
+            using var message = new HttpRequestMessage(HttpMethod.Post, _options.Endpoints.Email)
             {
                 Content = JsonContent.Create(request)
             };
             using var response = await SendAsync(message, cancellationToken);
             return await ReadAsync<SendEmailResponse>(response, message, cancellationToken)
-                ?? throw new ApiCallException($"POST {EmailPath} returned an empty body.", response.StatusCode);
+                ?? throw new ApiCallException($"POST {_options.Endpoints.Email} returned an empty body.", response.StatusCode);
         }
 
         public async Task<StagingLoadResponse> LoadProductRiskStagingAsync(CancellationToken cancellationToken = default)
         {
-            using var message = new HttpRequestMessage(HttpMethod.Post, StagingPath);
+            using var message = new HttpRequestMessage(HttpMethod.Post, _options.Endpoints.ProductRiskStaging);
             using var response = await SendAsync(message, cancellationToken);
             return await ReadAsync<StagingLoadResponse>(response, message, cancellationToken)
-                ?? throw new ApiCallException($"POST {StagingPath} returned an empty body.", response.StatusCode);
+                ?? throw new ApiCallException($"POST {_options.Endpoints.ProductRiskStaging} returned an empty body.", response.StatusCode);
         }
 
         private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -96,7 +96,7 @@ namespace KeyBasedAuthenticationTemplate_Automation.Api
         }
 
         // Prefer the ProblemDetails title; fall back to a truncated raw body.
-        private static async Task<string> ReadErrorDetailAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+        private async Task<string> ReadErrorDetailAsync(HttpResponseMessage response, CancellationToken cancellationToken)
         {
             string body;
             try
@@ -128,7 +128,8 @@ namespace KeyBasedAuthenticationTemplate_Automation.Api
                 // Not JSON - fall through to the raw body.
             }
 
-            return body.Length <= MaxErrorDetailLength ? body : body[..MaxErrorDetailLength] + "...";
+            var max = _options.ErrorDetailMaxLength;
+            return body.Length <= max ? body : body[..max] + "...";
         }
     }
 }
