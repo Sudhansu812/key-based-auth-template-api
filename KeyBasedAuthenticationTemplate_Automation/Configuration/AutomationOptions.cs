@@ -1,32 +1,15 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace KeyBasedAuthenticationTemplate_Automation.Configuration
 {
-    // Bound from the "Automation" section - in practice from Automation__* environment
-    // variables loaded out of env/.env. The ApiKey is a secret and must never be logged.
+    // Bound from the "Automation" section of appsettings.json. Secrets (Api:Key) are not stored there:
+    // they come from env/.env or real environment variables, e.g. Automation__Api__Key. Any value can be
+    // overridden the same way (Automation__Reports__OutputDirectory, ...). Logging is configured by the
+    // standard "Serilog" section in the same file.
     public class AutomationOptions
     {
         public const string SectionName = "Automation";
 
-        [Required, Url]
-        public string ApiBaseUrl { get; set; } = string.Empty;
-
-        [Required]
-        public string ApiKey { get; set; } = string.Empty;
-
-        [Range(1, 600)]
-        public int ApiTimeoutSeconds { get; set; } = 60;
-
-        [Required]
-        public string ReportOutputDirectory { get; set; } = "reports-output";
-
-        [Required]
-        public string LogDirectory { get; set; } = "logs";
-
-        [Required, MinLength(1)]
-        public string[] ReportRecipients { get; set; } = [];
-
-        [Required, MinLength(1)]
-        public string[] ErrorNotificationRecipients { get; set; } = [];
+        public ApiOptions Api { get; set; } = new();
+        public ReportsOptions Reports { get; set; } = new();
+        public ErrorNotificationOptions ErrorNotification { get; set; } = new();
     }
 }

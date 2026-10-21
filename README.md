@@ -433,12 +433,12 @@ CREATE TABLE stg.ProductRiskSummary (
 Automation ──(X-Api-Key)──► API reports ──► Excel (.xlsx) ──► POST /api/notifications/email (mock)
 ```
 
-Depending on the mode (below) it first refreshes the SQL Server staging table, then generates four reports — `products-ef`, `users-ef`, `products-dapper`, `users-dapper` — saves each to `Automation__ReportOutputDirectory`, and sends one digest email with all files attached. A failing report is logged and skipped, and any failure sends an error-notification email to `Automation__ErrorNotificationRecipients`. Exit code: `0` all good, `1` at least one report/email failed, `2` bad configuration or crash.
+Depending on the mode (below) it first refreshes the SQL Server staging table, then generates four reports — `products-ef`, `users-ef`, `products-dapper`, `users-dapper` — saves each to `Automation:Reports:OutputDirectory`, and sends one digest email with all files attached. A failing report is logged and skipped, and any failure sends an error-notification email to `Automation:ErrorNotification:Recipients`. Exit code: `0` all good, `1` at least one report/email failed, `2` bad configuration or crash.
 
 **Setup**
 
 1. Start the API, log in as an Admin, and create a **ReadWrite** key (`POST /api/apikeys`) — ReadWrite is needed because sending the mock email is a `POST`.
-2. Add the Automation settings from `env/.example.env` to `env/.env` (gitignored) — at minimum `Automation__ApiBaseUrl` and `Automation__ApiKey`. The Automation project finds `env/.env` by walking up from the working directory; real environment variables take precedence.
+2. Put the key in `env/.env` (gitignored) as `Automation__Api__Key=...` (see `env/.example.env`). Everything else is configured in `KeyBasedAuthenticationTemplate_Automation/appsettings.json` — check at least `Automation:Api:BaseUrl` and the recipients. The Automation project finds `env/.env` by walking up from the working directory; real environment variables take precedence.
 3. Run it (API must be running). The optional argument picks the mode:
    ```bash
    dotnet run --project KeyBasedAuthenticationTemplate_Automation                      # same as "reports"
@@ -449,19 +449,27 @@ Depending on the mode (below) it first refreshes the SQL Server staging table, t
 
    Schedule it with Windows Task Scheduler / cron / CI — there is no in-process scheduler.
 
-**Logs** are written as structured JSON, one file per day, to `Automation__LogDirectory` (`automation-YYYYMMDD.log`, 30 days kept): every API call (method, path, status, elapsed), each generated report, emails, and failures with exceptions. The API key is never logged.
+**Configuration** lives in `KeyBasedAuthenticationTemplate_Automation/appsettings.json` (copied next to the executable and read from there, whatever the working directory). Only secrets stay in `env/.env`. Any value can be overridden by an environment variable or `env/.env` line using `__` for nesting and indexes for arrays, e.g. `Automation__Reports__OutputDirectory=D:/reports` or `Automation__Reports__Recipients__0=me@example.com`.
 
-| Variable | Example | Purpose |
+| Setting (`Automation:` section) | Default | Purpose |
 |---|---|---|
-| `Automation__ApiBaseUrl` | `http://localhost:5090` | API to call |
-| `Automation__ApiKey` | `kbat_<keyId>.<secret>` | **Secret** — the ReadWrite API key |
-| `Automation__ApiTimeoutSeconds` | `60` | Per-call HTTP timeout (the staging call runs a query plus a bulk load, so it can take longer than a report call) |
-| `Database__CommandTimeoutSeconds` (API) | `60` | Dapper command timeout (reads, TRUNCATE) |
-| `Database__BulkCopyTimeoutSeconds` (API) | `60` | `SqlBulkCopy` timeout — covers the whole streamed load, so it includes time spent waiting on a slow source query |
-| `Automation__ReportOutputDirectory` | `reports-output` | Where `.xlsx` files are saved |
-| `Automation__LogDirectory` | `logs` | Where JSON logs are written |
-| `Automation__ReportRecipients__0` | `reports@example.com` | Digest email recipients (indexed array) |
-| `Automation__ErrorNotificationRecipients__0` | `ops-alerts@example.com` | Failure email recipients (indexed array) |
+| `Api:BaseUrl` | `http://localhost:5090` | API to call |
+| `Api:Key` | *(empty)* | **Secret** — the ReadWrite API key; set `Automation__Api__Key` in `env/.env`, never in appsettings.json |
+| `Api:TimeoutSeconds` | `60` | Per-call HTTP timeout (the staging call runs a query plus a bulk load, so it can take longer than a report call) |
+| `Api:ErrorDetailMaxLength` | `300` | API error bodies are cut to this length in messages/logs |
+| `Api:Endpoints:Email` / `ProductRiskStaging` | `api/notifications/email` / `api/staging/product-risk-summary` | Non-report endpoint paths |
+| `Reports:OutputDirectory` | `reports-output` | Where `.xlsx` files are saved (relative = working directory; use an absolute path for scheduled runs) |
+| `Reports:FileTimestampFormat` | `yyyyMMdd_HHmmss` | Timestamp in `{report}_{timestamp}.xlsx` (UTC) |
+| `Reports:Recipients` | `["reports@example.com"]` | Digest email recipients |
+| `Reports:EmailSubject` | `Automated reports - {0:yyyy-MM-dd}` | `{0}` = run start time |
+| `Reports:Definitions:<name>` | one per report | `Enabled`, `Endpoint` and `SheetName` for `products-ef`, `users-ef`, `products-dapper`, `users-dapper` (set `Enabled` to `false` to skip a report) |
+| `ErrorNotification:Recipients` / `Subject` | `["ops-alerts@example.com"]` / `[ALERT] Report automation failed - {0} error(s)` | Failure email; `{0}` = number of errors |
+
+Startup validates all of this at once and exits with code `2` listing every problem (missing key, bad URL, empty recipients, ...). Column layouts and Excel styling are code (`ReportColumns`, `ClosedXmlReportWriter`), not configuration.
+
+**Logging** is the standard Serilog `Serilog` section of the same file: sinks, log file path (`logs/automation-.log`), rolling interval, retention (30 files), minimum levels and the JSON format. Override the file path with e.g. `Serilog__WriteTo__1__Args__path=D:/logs/automation-.log`. Logs are structured JSON, one file per day: every API call (method, path, status, elapsed), each generated report, emails, and failures with exceptions. The API key is never logged.
+
+API-side timeouts (`Database:CommandTimeoutSeconds`, `Database:BulkCopyTimeoutSeconds`, both `60`) are in the API's `appsettings.json`. `BulkCopyTimeoutSeconds` covers the whole streamed load, so it includes time spent waiting on a slow source query.
 
 Shared request/response models used by both the API and Automation (`ProductResponse`, `UserSummaryResponse`, the email DTOs, the `X-Api-Key` header name) live in `KeyBasedAuthenticationTemplate_Contracts`.
 

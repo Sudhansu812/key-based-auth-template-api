@@ -10,8 +10,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Serilog;
-using Serilog.Events;
-using Serilog.Formatting.Json;
 
 // Exit codes: 0 = all reports generated and delivered, 1 = at least one report/email failed,
 // 2 = could not start (bad configuration or unexpected crash).
@@ -27,25 +25,18 @@ if (!RunModeParser.TryParse(args, out var runMode))
 
 LoadEnvFile();
 
-var builder = Host.CreateApplicationBuilder(args);
+// appsettings.json is read from the application folder (copied next to the exe), not the working
+// directory, so the job behaves the same however and wherever it is launched.
+var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
 
-// Logging is configured first (from the raw config value) so that configuration errors
-// found below still end up in the log file.
-var logDirectory = builder.Configuration[$"{AutomationOptions.SectionName}:{nameof(AutomationOptions.LogDirectory)}"] is { Length: > 0 } configured
-    ? configured
-    : "logs";
-
+// Logging is configured first, from the "Serilog" section of appsettings.json (sinks, log file path,
+// retention, levels, format), so configuration errors found below still end up in the log file.
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
-    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-    .MinimumLevel.Override("System.Net.Http.HttpClient", LogEventLevel.Warning)
-    .Enrich.FromLogContext()
-    .WriteTo.Console()
-    .WriteTo.File(
-        new JsonFormatter(renderMessage: true),
-        Path.Combine(logDirectory, "automation-.log"),
-        rollingInterval: RollingInterval.Day,
-        retainedFileCountLimit: 30)
+    .ReadFrom.Configuration(builder.Configuration)
     .CreateLogger();
 
 builder.Logging.ClearProviders();
@@ -54,16 +45,16 @@ builder.Logging.AddSerilog(Log.Logger, dispose: true);
 try
 {
     builder.Services.AddOptions<AutomationOptions>()
-        .Bind(builder.Configuration.GetSection(AutomationOptions.SectionName))
-        .ValidateDataAnnotations();
+        .Bind(builder.Configuration.GetSection(AutomationOptions.SectionName));
+    builder.Services.AddSingleton<IValidateOptions<AutomationOptions>, AutomationOptionsValidator>();
 
     // The API key is attached once, here, as a default header - it is never logged.
     builder.Services.AddHttpClient<IReportApiClient, ReportApiClient>((serviceProvider, client) =>
     {
-        var options = serviceProvider.GetRequiredService<IOptions<AutomationOptions>>().Value;
-        client.BaseAddress = new Uri(options.ApiBaseUrl.TrimEnd('/') + "/");
-        client.Timeout = TimeSpan.FromSeconds(options.ApiTimeoutSeconds);
-        client.DefaultRequestHeaders.Add(ApiKeyHeader.Name, options.ApiKey);
+        var api = serviceProvider.GetRequiredService<IOptions<AutomationOptions>>().Value.Api;
+        client.BaseAddress = new Uri(api.BaseUrl.TrimEnd('/') + "/");
+        client.Timeout = TimeSpan.FromSeconds(api.TimeoutSeconds);
+        client.DefaultRequestHeaders.Add(ApiKeyHeader.Name, api.Key);
     });
 
     builder.Services.AddSingleton(TimeProvider.System);

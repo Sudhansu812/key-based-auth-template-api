@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using KeyBasedAuthenticationTemplate_Automation.Api;
 using KeyBasedAuthenticationTemplate_Automation.Configuration;
@@ -14,7 +15,7 @@ namespace KeyBasedAuthenticationTemplate_Automation.Reports
     {
         private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-        private readonly IEnumerable<IReport> _reports;
+        private readonly IReadOnlyList<IReport> _reports;
         private readonly IReportApiClient _apiClient;
         private readonly AutomationOptions _options;
         private readonly TimeProvider _timeProvider;
@@ -27,7 +28,7 @@ namespace KeyBasedAuthenticationTemplate_Automation.Reports
             TimeProvider timeProvider,
             ILogger<ReportRunner> logger)
         {
-            _reports = reports;
+            _reports = reports.Where(r => r.Enabled).ToList();
             _apiClient = apiClient;
             _options = options.Value;
             _timeProvider = timeProvider;
@@ -38,7 +39,7 @@ namespace KeyBasedAuthenticationTemplate_Automation.Reports
         public async Task<bool> RunAsync(RunMode mode, CancellationToken cancellationToken = default)
         {
             var startedAt = _timeProvider.GetUtcNow();
-            _logger.LogInformation("Run started: mode {Mode}, {ReportCount} report(s)", mode, _reports.Count());
+            _logger.LogInformation("Run started: mode {Mode}, {ReportCount} report(s)", mode, _reports.Count);
 
             var attachments = new List<EmailAttachment>();
             var summaries = new List<string>();
@@ -59,7 +60,8 @@ namespace KeyBasedAuthenticationTemplate_Automation.Reports
                     _logger.LogInformation("Generating report {Report}", report.Name);
                     var generated = await report.GenerateAsync(cancellationToken);
 
-                    var fileName = $"{report.Name}_{startedAt:yyyyMMdd_HHmmss}.xlsx";
+                    var timestamp = startedAt.ToString(_options.Reports.FileTimestampFormat, CultureInfo.InvariantCulture);
+                    var fileName = $"{report.Name}_{timestamp}.xlsx";
                     var path = await SaveAsync(fileName, generated.Content, cancellationToken);
 
                     _logger.LogInformation(
@@ -87,8 +89,8 @@ namespace KeyBasedAuthenticationTemplate_Automation.Reports
                     "report delivery",
                     new SendEmailRequest
                     {
-                        To = [.. _options.ReportRecipients],
-                        Subject = $"Automated reports - {startedAt:yyyy-MM-dd}",
+                        To = [.. _options.Reports.Recipients],
+                        Subject = string.Format(CultureInfo.InvariantCulture, _options.Reports.EmailSubject, startedAt),
                         Body = "The following reports were generated:\n" + string.Join("\n", summaries.Select(s => "- " + s)),
                         Attachments = attachments
                     },
@@ -129,8 +131,8 @@ namespace KeyBasedAuthenticationTemplate_Automation.Reports
 
         private async Task<string> SaveAsync(string fileName, byte[] content, CancellationToken cancellationToken)
         {
-            Directory.CreateDirectory(_options.ReportOutputDirectory);
-            var path = Path.GetFullPath(Path.Combine(_options.ReportOutputDirectory, fileName));
+            Directory.CreateDirectory(_options.Reports.OutputDirectory);
+            var path = Path.GetFullPath(Path.Combine(_options.Reports.OutputDirectory, fileName));
             await File.WriteAllBytesAsync(path, content, cancellationToken);
             return path;
         }
@@ -165,8 +167,8 @@ namespace KeyBasedAuthenticationTemplate_Automation.Reports
 
             var email = new SendEmailRequest
             {
-                To = [.. _options.ErrorNotificationRecipients],
-                Subject = $"[ALERT] Report automation failed - {failures.Count} error(s)",
+                To = [.. _options.ErrorNotification.Recipients],
+                Subject = string.Format(CultureInfo.InvariantCulture, _options.ErrorNotification.Subject, failures.Count),
                 Body = body.ToString()
             };
 
