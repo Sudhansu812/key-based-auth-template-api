@@ -1,3 +1,4 @@
+using KeyBasedAuthenticationTemplate_API.Authorization;
 using KeyBasedAuthenticationTemplate_API.Common;
 using KeyBasedAuthenticationTemplate_API.DTOs.Products;
 using KeyBasedAuthenticationTemplate_Contracts.Products;
@@ -7,9 +8,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace KeyBasedAuthenticationTemplate_API.Controllers
 {
+    // Products are scoped by the calling key's OwnerUsername. Admin keys see and change every
+    // owner's products; Reporter keys can read every owner's products (GET /api/products is also
+    // the "products-ef" report) but writes stay limited to their own owner.
     [ApiController]
     [Route("api/products")]
-    [Authorize]
+    [Authorize(Policy = Policies.ReadAccess)]
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _productService;
@@ -22,45 +26,41 @@ namespace KeyBasedAuthenticationTemplate_API.Controllers
         [HttpGet]
         public async Task<ActionResult<List<ProductResponse>>> GetAll(CancellationToken cancellationToken)
         {
-            var result = await _productService.GetAccessibleAsync(User.GetUserId(), BypassOwnership(), cancellationToken);
+            var result = await _productService.GetAccessibleAsync(User.GetOwnerUsername(), BypassOwnershipForRead(), cancellationToken);
             return Ok(result);
         }
 
         [HttpGet("{id:guid}")]
         public async Task<ActionResult<ProductResponse>> GetById(Guid id, CancellationToken cancellationToken)
         {
-            var result = await _productService.GetByIdAsync(id, User.GetUserId(), BypassOwnership(), cancellationToken);
+            var result = await _productService.GetByIdAsync(id, User.GetOwnerUsername(), BypassOwnershipForRead(), cancellationToken);
             return Ok(result);
         }
 
         [HttpPost]
-        [Authorize(Policy = "WriteAccess")]
+        [Authorize(Policy = Policies.WriteAccess)]
         public async Task<ActionResult<ProductResponse>> Create(ProductRequest request, CancellationToken cancellationToken)
         {
-            // API keys have no owning user - products they create have no attributable owner.
-            var ownerId = User.IsApiKeyAuthenticated() ? Guid.Empty : User.GetUserId();
-            var result = await _productService.CreateAsync(ownerId, request, cancellationToken);
+            var result = await _productService.CreateAsync(User.GetOwnerUsername(), request, cancellationToken);
             return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
         }
 
         [HttpPut("{id:guid}")]
-        [Authorize(Policy = "WriteAccess")]
+        [Authorize(Policy = Policies.WriteAccess)]
         public async Task<ActionResult<ProductResponse>> Update(Guid id, ProductRequest request, CancellationToken cancellationToken)
         {
-            var result = await _productService.UpdateAsync(id, User.GetUserId(), BypassOwnership(), request, cancellationToken);
+            var result = await _productService.UpdateAsync(id, User.GetOwnerUsername(), User.IsAdmin(), request, cancellationToken);
             return Ok(result);
         }
 
         [HttpDelete("{id:guid}")]
-        [Authorize(Policy = "WriteAccess")]
+        [Authorize(Policy = Policies.WriteAccess)]
         public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
         {
-            await _productService.DeleteAsync(id, User.GetUserId(), BypassOwnership(), cancellationToken);
+            await _productService.DeleteAsync(id, User.GetOwnerUsername(), User.IsAdmin(), cancellationToken);
             return NoContent();
         }
 
-        // Admins and API keys both get unrestricted (within WriteAccess) access to all
-        // products, bypassing the per-owner filter that applies to regular JWT users.
-        private bool BypassOwnership() => User.IsAdmin() || User.IsApiKeyAuthenticated();
+        private bool BypassOwnershipForRead() => User.IsAdmin() || User.IsInRole(SystemRoleNames.Reporter);
     }
 }

@@ -16,22 +16,22 @@ namespace KeyBasedAuthenticationTemplate_API.Services
             _productRepository = productRepository;
         }
 
-        public async Task<List<ProductResponse>> GetAccessibleAsync(Guid userId, bool bypassOwnership, CancellationToken cancellationToken = default)
+        public async Task<List<ProductResponse>> GetAccessibleAsync(string ownerUsername, bool bypassOwnership, CancellationToken cancellationToken = default)
         {
             var products = bypassOwnership
                 ? await _productRepository.GetAllAsync(cancellationToken)
-                : await _productRepository.GetByOwnerAsync(userId, cancellationToken);
+                : await _productRepository.GetByOwnerAsync(ownerUsername, cancellationToken);
 
             return products.Select(ToResponse).ToList();
         }
 
-        public async Task<ProductResponse> GetByIdAsync(Guid id, Guid userId, bool bypassOwnership, CancellationToken cancellationToken = default)
+        public async Task<ProductResponse> GetByIdAsync(Guid id, string ownerUsername, bool bypassOwnership, CancellationToken cancellationToken = default)
         {
-            var product = await GetOwnedOrThrowAsync(id, userId, bypassOwnership, cancellationToken);
+            var product = await GetOwnedOrThrowAsync(id, ownerUsername, bypassOwnership, cancellationToken);
             return ToResponse(product);
         }
 
-        public async Task<ProductResponse> CreateAsync(Guid ownerUserId, ProductRequest request, CancellationToken cancellationToken = default)
+        public async Task<ProductResponse> CreateAsync(string ownerUsername, ProductRequest request, CancellationToken cancellationToken = default)
         {
             var product = new Product
             {
@@ -40,7 +40,7 @@ namespace KeyBasedAuthenticationTemplate_API.Services
                 Description = request.Description,
                 Price = request.Price,
                 Stock = request.Stock,
-                OwnerUserId = ownerUserId,
+                OwnerUsername = ownerUsername,
                 CreatedAtUtc = DateTime.UtcNow
             };
 
@@ -50,9 +50,9 @@ namespace KeyBasedAuthenticationTemplate_API.Services
             return ToResponse(product);
         }
 
-        public async Task<ProductResponse> UpdateAsync(Guid id, Guid userId, bool bypassOwnership, ProductRequest request, CancellationToken cancellationToken = default)
+        public async Task<ProductResponse> UpdateAsync(Guid id, string ownerUsername, bool bypassOwnership, ProductRequest request, CancellationToken cancellationToken = default)
         {
-            var product = await GetOwnedOrThrowAsync(id, userId, bypassOwnership, cancellationToken);
+            var product = await GetOwnedOrThrowAsync(id, ownerUsername, bypassOwnership, cancellationToken);
 
             product.Name = request.Name;
             product.Description = request.Description;
@@ -65,19 +65,19 @@ namespace KeyBasedAuthenticationTemplate_API.Services
             return ToResponse(product);
         }
 
-        public async Task DeleteAsync(Guid id, Guid userId, bool bypassOwnership, CancellationToken cancellationToken = default)
+        public async Task DeleteAsync(Guid id, string ownerUsername, bool bypassOwnership, CancellationToken cancellationToken = default)
         {
-            var product = await GetOwnedOrThrowAsync(id, userId, bypassOwnership, cancellationToken);
+            var product = await GetOwnedOrThrowAsync(id, ownerUsername, bypassOwnership, cancellationToken);
             _productRepository.Remove(product);
             await _productRepository.SaveChangesAsync(cancellationToken);
         }
 
-        private async Task<Product> GetOwnedOrThrowAsync(Guid id, Guid userId, bool bypassOwnership, CancellationToken cancellationToken)
+        private async Task<Product> GetOwnedOrThrowAsync(Guid id, string ownerUsername, bool bypassOwnership, CancellationToken cancellationToken)
         {
             var product = await _productRepository.GetByIdAsync(id, cancellationToken)
                 ?? throw new NotFoundException("Product not found.");
 
-            if (!bypassOwnership && product.OwnerUserId != userId)
+            if (!bypassOwnership && !string.Equals(product.OwnerUsername, ownerUsername, StringComparison.OrdinalIgnoreCase))
             {
                 throw new ForbiddenException("You do not have access to this product.");
             }
@@ -92,7 +92,7 @@ namespace KeyBasedAuthenticationTemplate_API.Services
             Description = product.Description,
             Price = product.Price,
             Stock = product.Stock,
-            OwnerUserId = product.OwnerUserId,
+            OwnerUsername = product.OwnerUsername,
             CreatedAtUtc = product.CreatedAtUtc,
             UpdatedAtUtc = product.UpdatedAtUtc
         };

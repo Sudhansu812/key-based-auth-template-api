@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
 {
     [DbContext(typeof(AuthDbContext))]
-    [Migration("20261003165711_InitialCreate")]
+    [Migration("20261111045240_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -20,21 +20,31 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("ApiKeyRoles", b =>
+                {
+                    b.Property<Guid>("ApiKeyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("ApiKeyId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("ApiKeyRoles");
+                });
 
             modelBuilder.Entity("KeyBasedAuthenticationTemplate_API.Entities.ApiKey", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("AccessLevel")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
@@ -60,6 +70,11 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
+                    b.Property<string>("OwnerUsername")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<DateTime?>("RevokedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -67,6 +82,8 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
 
                     b.HasIndex("KeyId")
                         .IsUnique();
+
+                    b.HasIndex("OwnerUsername");
 
                     b.ToTable("ApiKeys", (string)null);
                 });
@@ -79,6 +96,10 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<bool>("IsSystemRole")
                         .HasColumnType("bit");
@@ -96,72 +117,17 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
                     b.ToTable("Roles", (string)null);
                 });
 
-            modelBuilder.Entity("KeyBasedAuthenticationTemplate_API.Entities.User", b =>
+            modelBuilder.Entity("ApiKeyRoles", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Email")
-                        .IsUnique();
-
-                    b.HasIndex("Username")
-                        .IsUnique();
-
-                    b.ToTable("Users", (string)null);
-                });
-
-            modelBuilder.Entity("UserRoles", b =>
-                {
-                    b.Property<Guid>("RoleId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("RoleId", "UserId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserRoles");
-                });
-
-            modelBuilder.Entity("UserRoles", b =>
-                {
-                    b.HasOne("KeyBasedAuthenticationTemplate_API.Entities.Role", null)
+                    b.HasOne("KeyBasedAuthenticationTemplate_API.Entities.ApiKey", null)
                         .WithMany()
-                        .HasForeignKey("RoleId")
+                        .HasForeignKey("ApiKeyId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("KeyBasedAuthenticationTemplate_API.Entities.User", null)
+                    b.HasOne("KeyBasedAuthenticationTemplate_API.Entities.Role", null)
                         .WithMany()
-                        .HasForeignKey("UserId")
+                        .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

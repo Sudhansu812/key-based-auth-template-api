@@ -15,7 +15,7 @@ WITH t AS (
     WHERE 1 = 1
        OR (price >= @MinPrice                 -- numeric(18,2)
            AND stock >= @MinStock             -- integer
-           AND owner_user_id = @OwnerUserId   -- uuid
+           AND owner_username = @OwnerUsername -- varchar(64)
            AND name ILIKE @NamePattern        -- text
            AND created_at_utc >= @CreatedFrom -- timestamptz
            AND updated_at_utc <= @UpdatedBefore -- timestamptz, bound as NULL

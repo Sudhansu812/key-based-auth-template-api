@@ -20,9 +20,9 @@ namespace KeyBasedAuthenticationTemplate_API.Repository.DB
         public Task<List<Product>> GetAllAsync(CancellationToken cancellationToken = default) =>
             _context.Products.AsNoTracking().OrderByDescending(p => p.CreatedAtUtc).ToListAsync(cancellationToken);
 
-        public Task<List<Product>> GetByOwnerAsync(Guid ownerUserId, CancellationToken cancellationToken = default) =>
+        public Task<List<Product>> GetByOwnerAsync(string ownerUsername, CancellationToken cancellationToken = default) =>
             _context.Products.AsNoTracking()
-                .Where(p => p.OwnerUserId == ownerUserId)
+                .Where(p => p.OwnerUsername == ownerUsername)
                 .OrderByDescending(p => p.CreatedAtUtc)
                 .ToListAsync(cancellationToken);
 

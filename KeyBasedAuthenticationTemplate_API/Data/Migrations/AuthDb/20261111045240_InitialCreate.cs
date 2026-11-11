@@ -17,9 +17,9 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    OwnerUsername = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
                     KeyId = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
                     KeyHash = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
-                    AccessLevel = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
                     CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
                     ExpiresAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
                     RevokedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -36,6 +36,7 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
                 {
                     Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     IsSystemRole = table.Column<bool>(type: "bit", nullable: false),
                     CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
@@ -45,45 +46,33 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
                 });
 
             migrationBuilder.CreateTable(
-                name: "Users",
+                name: "ApiKeyRoles",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    Username = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
-                    PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false),
-                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true)
+                    ApiKeyId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    RoleId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Users", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "UserRoles",
-                columns: table => new
-                {
-                    RoleId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserRoles", x => new { x.RoleId, x.UserId });
+                    table.PrimaryKey("PK_ApiKeyRoles", x => new { x.ApiKeyId, x.RoleId });
                     table.ForeignKey(
-                        name: "FK_UserRoles_Roles_RoleId",
+                        name: "FK_ApiKeyRoles_ApiKeys_ApiKeyId",
+                        column: x => x.ApiKeyId,
+                        principalTable: "ApiKeys",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ApiKeyRoles_Roles_RoleId",
                         column: x => x.RoleId,
                         principalTable: "Roles",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_UserRoles_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ApiKeyRoles_RoleId",
+                table: "ApiKeyRoles",
+                column: "RoleId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ApiKeys_KeyId",
@@ -92,26 +81,14 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_ApiKeys_OwnerUsername",
+                table: "ApiKeys",
+                column: "OwnerUsername");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Roles_Name",
                 table: "Roles",
                 column: "Name",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_UserRoles_UserId",
-                table: "UserRoles",
-                column: "UserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Users_Email",
-                table: "Users",
-                column: "Email",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Users_Username",
-                table: "Users",
-                column: "Username",
                 unique: true);
         }
 
@@ -119,16 +96,13 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AuthDb
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "ApiKeyRoles");
+
+            migrationBuilder.DropTable(
                 name: "ApiKeys");
 
             migrationBuilder.DropTable(
-                name: "UserRoles");
-
-            migrationBuilder.DropTable(
                 name: "Roles");
-
-            migrationBuilder.DropTable(
-                name: "Users");
         }
     }
 }

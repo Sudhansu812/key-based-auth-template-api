@@ -7,7 +7,7 @@ namespace KeyBasedAuthenticationTemplate_Contracts.Products
         public string? Description { get; set; }
         public decimal Price { get; set; }
         public int Stock { get; set; }
-        public Guid OwnerUserId { get; set; }
+        public string OwnerUsername { get; set; } = string.Empty;
         public DateTime CreatedAtUtc { get; set; }
         public DateTime? UpdatedAtUtc { get; set; }
     }

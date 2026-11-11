@@ -20,8 +20,11 @@ namespace KeyBasedAuthenticationTemplate_API.Repository.DB
         public Task<List<Role>> GetAllAsync(CancellationToken cancellationToken = default) =>
             _context.Roles.AsNoTracking().OrderBy(r => r.Name).ToListAsync(cancellationToken);
 
-        public Task<List<Role>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken = default) =>
-            _context.Roles.Where(r => ids.Contains(r.Id)).ToListAsync(cancellationToken);
+        public Task<List<Role>> GetByNamesAsync(IEnumerable<string> names, CancellationToken cancellationToken = default)
+        {
+            var nameList = names.ToList();
+            return _context.Roles.Where(r => nameList.Contains(r.Name)).ToListAsync(cancellationToken);
+        }
 
         public Task<bool> ExistsByNameAsync(string name, CancellationToken cancellationToken = default) =>
             _context.Roles.AnyAsync(r => r.Name == name, cancellationToken);

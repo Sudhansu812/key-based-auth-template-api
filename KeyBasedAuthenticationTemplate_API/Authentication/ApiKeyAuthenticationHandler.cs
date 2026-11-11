@@ -41,7 +41,7 @@ namespace KeyBasedAuthenticationTemplate_API.Authentication
                 return AuthenticateResult.Fail("Invalid API key format.");
             }
 
-            var apiKey = await _apiKeyRepository.GetByKeyIdAsync(keyId);
+            var apiKey = await _apiKeyRepository.GetByKeyIdWithRolesAsync(keyId);
             if (apiKey is null || !_apiKeyGenerator.VerifyHash(secret, apiKey.KeyHash))
             {
                 return AuthenticateResult.Fail("Invalid API key.");
@@ -60,15 +60,15 @@ namespace KeyBasedAuthenticationTemplate_API.Authentication
             apiKey.LastUsedAtUtc = DateTime.UtcNow;
             await _apiKeyRepository.SaveChangesAsync();
 
-            // An API key is a standalone credential - it has no owning user, and
-            // deliberately carries no role claim, so it can never reach an
-            // [Authorize(Roles = ...)] endpoint regardless of access level.
-            var claims = new[]
+            // One role claim per role on the key, so [Authorize(Roles = ...)] and the role-based
+            // policies work directly. The owner username drives product ownership scoping.
+            var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.NameIdentifier, apiKey.Id.ToString()),
-                new Claim(ClaimTypes.Name, apiKey.Name),
-                new Claim(ApiKeyAuthenticationOptions.AccessLevelClaimType, apiKey.AccessLevel.ToString())
+                new(ClaimTypes.NameIdentifier, apiKey.Id.ToString()),
+                new(ClaimTypes.Name, apiKey.Name),
+                new(ApiKeyAuthenticationOptions.OwnerUsernameClaimType, apiKey.OwnerUsername)
             };
+            claims.AddRange(apiKey.Roles.Select(role => new Claim(ClaimTypes.Role, role.Name)));
 
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             var principal = new ClaimsPrincipal(identity);

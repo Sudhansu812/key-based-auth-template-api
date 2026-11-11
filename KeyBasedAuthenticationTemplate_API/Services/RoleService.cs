@@ -26,6 +26,7 @@ namespace KeyBasedAuthenticationTemplate_API.Services
             {
                 Id = Guid.NewGuid(),
                 Name = request.Name,
+                Description = request.Description,
                 IsSystemRole = false,
                 CreatedAtUtc = DateTime.UtcNow
             };
@@ -46,6 +47,7 @@ namespace KeyBasedAuthenticationTemplate_API.Services
         {
             Id = role.Id,
             Name = role.Name,
+            Description = role.Description,
             IsSystemRole = role.IsSystemRole,
             CreatedAtUtc = role.CreatedAtUtc
         };

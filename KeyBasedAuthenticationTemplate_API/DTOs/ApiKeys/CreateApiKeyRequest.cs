@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using KeyBasedAuthenticationTemplate_API.Entities;
 
 namespace KeyBasedAuthenticationTemplate_API.DTOs.ApiKeys
 {
@@ -8,7 +7,14 @@ namespace KeyBasedAuthenticationTemplate_API.DTOs.ApiKeys
         [Required, MaxLength(128)]
         public string Name { get; set; } = string.Empty;
 
-        public ApiKeyAccessLevel AccessLevel { get; set; } = ApiKeyAccessLevel.ReadOnly;
+        // Products created with this key are owned by this username, and non-Admin keys
+        // only see products with the same owner.
+        [Required, MinLength(2), MaxLength(64)]
+        public string OwnerUsername { get; set; } = string.Empty;
+
+        // Role names, e.g. ["Reader", "Writer"]. Every name must exist in the Roles table.
+        [Required, MinLength(1)]
+        public List<string> Roles { get; set; } = new();
 
         // Null means the key never expires.
         [Range(1, 3650)]

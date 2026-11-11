@@ -6,8 +6,9 @@ namespace KeyBasedAuthenticationTemplate_API.DTOs.ApiKeys
     {
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
+        public string OwnerUsername { get; set; } = string.Empty;
         public string FullKey { get; set; } = string.Empty;
-        public string AccessLevel { get; set; } = string.Empty;
+        public List<string> Roles { get; set; } = new();
         public DateTime CreatedAtUtc { get; set; }
         public DateTime? ExpiresAtUtc { get; set; }
     }

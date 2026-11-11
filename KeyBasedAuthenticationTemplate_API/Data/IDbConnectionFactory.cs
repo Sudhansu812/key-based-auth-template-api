@@ -8,7 +8,7 @@ namespace KeyBasedAuthenticationTemplate_API.Data
     // Provider-specific types are returned so callers can use SqlBulkCopy etc.
     public interface IDbConnectionFactory
     {
-        // SQL Server - Users, Roles, UserRoles, ApiKeys, stg.*.
+        // SQL Server - Roles, ApiKeys, ApiKeyRoles, stg.*.
         SqlConnection CreateAuthConnection();
 
         // PostgreSQL - Products.

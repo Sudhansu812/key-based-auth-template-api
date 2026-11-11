@@ -17,7 +17,7 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AppDb
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -43,9 +43,11 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AppDb
                         .HasColumnType("character varying(256)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("OwnerUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_user_id");
+                    b.Property<string>("OwnerUsername")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("owner_username");
 
                     b.Property<decimal>("Price")
                         .HasColumnType("numeric(18,2)")
@@ -62,8 +64,8 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AppDb
                     b.HasKey("Id")
                         .HasName("pk_products");
 
-                    b.HasIndex("OwnerUserId")
-                        .HasDatabaseName("ix_products_owner_user_id");
+                    b.HasIndex("OwnerUsername")
+                        .HasDatabaseName("ix_products_owner_username");
 
                     b.ToTable("products", (string)null);
                 });

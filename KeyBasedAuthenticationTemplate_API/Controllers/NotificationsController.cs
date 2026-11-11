@@ -6,11 +6,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace KeyBasedAuthenticationTemplate_API.Controllers
 {
-    // Mock email delivery. Sending is a side effect, so on top of ReportAccess it also requires
-    // WriteAccess - a ReadOnly API key can read reports but cannot trigger emails.
+    // Mock email delivery. Sending is a side effect, so on top of ReportAccess (Reporter) it also
+    // requires WriteAccess (Writer) - a Reporter-only key can read reports but cannot trigger emails.
     [ApiController]
     [Route("api/notifications")]
-    [Authorize(Policy = ReportAccessRequirement.PolicyName)]
+    [Authorize(Policy = Policies.ReportAccess)]
     public class NotificationsController : ControllerBase
     {
         // Attachments travel base64-encoded in the JSON body.
@@ -24,7 +24,7 @@ namespace KeyBasedAuthenticationTemplate_API.Controllers
         }
 
         [HttpPost("email")]
-        [Authorize(Policy = "WriteAccess")]
+        [Authorize(Policy = Policies.WriteAccess)]
         [RequestSizeLimit(MaxRequestBodyBytes)]
         public async Task<ActionResult<SendEmailResponse>> SendEmail(SendEmailRequest request, CancellationToken cancellationToken)
         {

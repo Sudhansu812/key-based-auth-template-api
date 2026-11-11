@@ -1,12 +1,13 @@
 using KeyBasedAuthenticationTemplate_API.Common;
 using KeyBasedAuthenticationTemplate_API.DTOs.ApiKeys;
 using KeyBasedAuthenticationTemplate_API.Services.Interfaces;
+using KeyBasedAuthenticationTemplate_Contracts.ApiKeys;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KeyBasedAuthenticationTemplate_API.Controllers
 {
-    // API keys are standalone, Admin-managed credentials - not self-service per user.
+    // Key management is restricted to keys holding the Admin role.
     [ApiController]
     [Route("api/apikeys")]
     [Authorize(Roles = SystemRoleNames.Admin)]
@@ -30,6 +31,13 @@ namespace KeyBasedAuthenticationTemplate_API.Controllers
         public async Task<ActionResult<List<ApiKeySummaryResponse>>> GetAll(CancellationToken cancellationToken)
         {
             var result = await _apiKeyService.GetAllAsync(cancellationToken);
+            return Ok(result);
+        }
+
+        [HttpPut("{id:guid}/roles")]
+        public async Task<ActionResult<ApiKeySummaryResponse>> AssignRoles(Guid id, AssignApiKeyRolesRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _apiKeyService.AssignRolesAsync(id, request.Roles, cancellationToken);
             return Ok(result);
         }
 
