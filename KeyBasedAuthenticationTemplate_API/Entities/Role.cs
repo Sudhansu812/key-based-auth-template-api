@@ -4,13 +4,14 @@ namespace KeyBasedAuthenticationTemplate_API.Entities
     {
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
 
-        // Seeded roles (Admin, User) that must always exist - protected from
-        // deletion/renaming by any future role-management endpoint.
+        // Seeded roles (Admin, Reader, Writer, Reporter) that the authorization policies
+        // depend on - protected from deletion/renaming by any future role-management endpoint.
         public bool IsSystemRole { get; set; }
 
         public DateTime CreatedAtUtc { get; set; }
 
-        public ICollection<User> Users { get; set; } = new List<User>();
+        public ICollection<ApiKey> ApiKeys { get; set; } = new List<ApiKey>();
     }
 }

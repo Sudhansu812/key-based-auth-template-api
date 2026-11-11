@@ -6,10 +6,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace KeyBasedAuthenticationTemplate_API.Controllers
 {
-    // Writes to SQL Server, so on top of ReportAccess it also requires WriteAccess (ReadWrite key).
+    // Writes to SQL Server, so on top of ReportAccess (Reporter) it also requires WriteAccess (Writer).
     [ApiController]
     [Route("api/staging")]
-    [Authorize(Policy = ReportAccessRequirement.PolicyName)]
+    [Authorize(Policy = Policies.ReportAccess)]
     public class StagingController : ControllerBase
     {
         private readonly IStagingService _stagingService;
@@ -21,7 +21,7 @@ namespace KeyBasedAuthenticationTemplate_API.Controllers
 
         // Full refresh: truncates stg.ProductRiskSummary and reloads it from PostgreSQL.
         [HttpPost("product-risk-summary")]
-        [Authorize(Policy = "WriteAccess")]
+        [Authorize(Policy = Policies.WriteAccess)]
         public async Task<ActionResult<StagingLoadResponse>> LoadProductRiskSummary(CancellationToken cancellationToken)
         {
             var result = await _stagingService.LoadProductRiskSummaryAsync(cancellationToken);

@@ -1,5 +1,5 @@
+using KeyBasedAuthenticationTemplate_Contracts.ApiKeys;
 using KeyBasedAuthenticationTemplate_Contracts.Products;
-using KeyBasedAuthenticationTemplate_Contracts.Users;
 
 namespace KeyBasedAuthenticationTemplate_API.Services.Interfaces
 {
@@ -7,6 +7,6 @@ namespace KeyBasedAuthenticationTemplate_API.Services.Interfaces
     public interface IReportService
     {
         Task<List<ProductResponse>> GetProductsAsync(CancellationToken cancellationToken = default);
-        Task<List<UserSummaryResponse>> GetUsersAsync(CancellationToken cancellationToken = default);
+        Task<List<ApiKeySummaryResponse>> GetApiKeysAsync(CancellationToken cancellationToken = default);
     }
 }

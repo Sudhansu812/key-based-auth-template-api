@@ -20,7 +20,7 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AppDb
                     description = table.Column<string>(type: "text", nullable: true),
                     price = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
                     stock = table.Column<int>(type: "integer", nullable: false),
-                    owner_user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    owner_username = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     created_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     updated_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
@@ -30,9 +30,9 @@ namespace KeyBasedAuthenticationTemplate_API.Data.Migrations.AppDb
                 });
 
             migrationBuilder.CreateIndex(
-                name: "ix_products_owner_user_id",
+                name: "ix_products_owner_username",
                 table: "products",
-                column: "owner_user_id");
+                column: "owner_username");
         }
 
         /// <inheritdoc />

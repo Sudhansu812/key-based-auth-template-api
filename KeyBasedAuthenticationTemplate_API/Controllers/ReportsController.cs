@@ -1,33 +1,33 @@
 using KeyBasedAuthenticationTemplate_API.Authorization;
 using KeyBasedAuthenticationTemplate_API.Services.Interfaces;
+using KeyBasedAuthenticationTemplate_Contracts.ApiKeys;
 using KeyBasedAuthenticationTemplate_Contracts.Products;
-using KeyBasedAuthenticationTemplate_Contracts.Users;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KeyBasedAuthenticationTemplate_API.Controllers
 {
     // Report data for the Automation project. "ef" endpoints read through EF Core, "dapper"
-    // endpoints return the same data through raw SQL. Products live in PostgreSQL, users in SQL Server.
-    // (Products via EF is the existing GET /api/products, which already accepts API keys.)
+    // endpoints return the same data through raw SQL. Products live in PostgreSQL, API keys in SQL Server.
+    // (Products via EF is the existing GET /api/products, which Reporter keys read unscoped.)
     [ApiController]
     [Route("api/reports")]
-    [Authorize(Policy = ReportAccessRequirement.PolicyName)]
+    [Authorize(Policy = Policies.ReportAccess)]
     public class ReportsController : ControllerBase
     {
-        private readonly IUserService _userService;
+        private readonly IApiKeyService _apiKeyService;
         private readonly IReportService _reportService;
 
-        public ReportsController(IUserService userService, IReportService reportService)
+        public ReportsController(IApiKeyService apiKeyService, IReportService reportService)
         {
-            _userService = userService;
+            _apiKeyService = apiKeyService;
             _reportService = reportService;
         }
 
-        [HttpGet("ef/users")]
-        public async Task<ActionResult<List<UserSummaryResponse>>> GetUsersEf(CancellationToken cancellationToken)
+        [HttpGet("ef/apikeys")]
+        public async Task<ActionResult<List<ApiKeySummaryResponse>>> GetApiKeysEf(CancellationToken cancellationToken)
         {
-            var result = await _userService.GetAllAsync(cancellationToken);
+            var result = await _apiKeyService.GetAllAsync(cancellationToken);
             return Ok(result);
         }
 
@@ -38,10 +38,10 @@ namespace KeyBasedAuthenticationTemplate_API.Controllers
             return Ok(result);
         }
 
-        [HttpGet("dapper/users")]
-        public async Task<ActionResult<List<UserSummaryResponse>>> GetUsersDapper(CancellationToken cancellationToken)
+        [HttpGet("dapper/apikeys")]
+        public async Task<ActionResult<List<ApiKeySummaryResponse>>> GetApiKeysDapper(CancellationToken cancellationToken)
         {
-            var result = await _reportService.GetUsersAsync(cancellationToken);
+            var result = await _reportService.GetApiKeysAsync(cancellationToken);
             return Ok(result);
         }
     }

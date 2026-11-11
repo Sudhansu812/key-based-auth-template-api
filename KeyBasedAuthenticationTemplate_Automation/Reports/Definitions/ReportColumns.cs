@@ -1,6 +1,6 @@
 using KeyBasedAuthenticationTemplate_Automation.Reports.Excel;
 using KeyBasedAuthenticationTemplate_Contracts.Products;
-using KeyBasedAuthenticationTemplate_Contracts.Users;
+using KeyBasedAuthenticationTemplate_Contracts.ApiKeys;
 
 namespace KeyBasedAuthenticationTemplate_Automation.Reports.Definitions
 {
@@ -17,19 +17,22 @@ namespace KeyBasedAuthenticationTemplate_Automation.Reports.Definitions
             new("Description", p => p.Description),
             new("Price", p => p.Price, "#,##0.00"),
             new("Stock", p => p.Stock),
-            new("Owner User Id", p => p.OwnerUserId),
+            new("Owner Username", p => p.OwnerUsername),
             new("Created (UTC)", p => p.CreatedAtUtc, DateTimeFormat),
             new("Updated (UTC)", p => p.UpdatedAtUtc, DateTimeFormat)
         ];
 
-        public static readonly IReadOnlyList<ExcelColumn<UserSummaryResponse>> Users =
+        public static readonly IReadOnlyList<ExcelColumn<ApiKeySummaryResponse>> ApiKeys =
         [
-            new("Id", u => u.Id),
-            new("Username", u => u.Username),
-            new("Email", u => u.Email),
-            new("Roles", u => string.Join(", ", u.Roles)),
-            new("Active", u => u.IsActive),
-            new("Created (UTC)", u => u.CreatedAtUtc, DateTimeFormat)
+            new("Id", k => k.Id),
+            new("Name", k => k.Name),
+            new("Owner Username", k => k.OwnerUsername),
+            new("Key Id", k => k.KeyId),
+            new("Roles", k => string.Join(", ", k.Roles)),
+            new("Created (UTC)", k => k.CreatedAtUtc, DateTimeFormat),
+            new("Expires (UTC)", k => k.ExpiresAtUtc, DateTimeFormat),
+            new("Revoked (UTC)", k => k.RevokedAtUtc, DateTimeFormat),
+            new("Last Used (UTC)", k => k.LastUsedAtUtc, DateTimeFormat)
         ];
     }
 }

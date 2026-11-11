@@ -18,7 +18,8 @@ namespace KeyBasedAuthenticationTemplate_API.Data
                 entity.HasKey(p => p.Id);
                 entity.Property(p => p.Name).IsRequired().HasMaxLength(256);
                 entity.Property(p => p.Price).HasColumnType("numeric(18,2)");
-                entity.HasIndex(p => p.OwnerUserId);
+                entity.Property(p => p.OwnerUsername).IsRequired().HasMaxLength(64);
+                entity.HasIndex(p => p.OwnerUsername);
             });
         }
     }

@@ -8,9 +8,9 @@ namespace KeyBasedAuthenticationTemplate_API.Entities
         public decimal Price { get; set; }
         public int Stock { get; set; }
 
-        // References User.Id in the (separate) auth database. No FK is possible
-        // across SQL Server/PostgreSQL, so this is a plain, unenforced Guid column.
-        public Guid OwnerUserId { get; set; }
+        // The OwnerUsername of the API key that created the product. Plain text, not a
+        // foreign key (API keys live in the separate SQL Server database).
+        public string OwnerUsername { get; set; } = string.Empty;
 
         public DateTime CreatedAtUtc { get; set; }
         public DateTime? UpdatedAtUtc { get; set; }

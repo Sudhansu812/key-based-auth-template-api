@@ -36,7 +36,7 @@ namespace KeyBasedAuthenticationTemplate_API.Repository.DapperDB
             var parameters = new DynamicParameters();
             parameters.Add("MinPrice", NoOpFilterValues.MinPrice, DbType.Decimal, precision: 18, scale: 2);
             parameters.Add("MinStock", NoOpFilterValues.MinStock, DbType.Int32);
-            parameters.Add("OwnerUserId", NoOpFilterValues.OwnerUserId, DbType.Guid);
+            parameters.Add("OwnerUsername", NoOpFilterValues.OwnerUsername, DbType.String, size: 64);
             parameters.Add("NamePattern", NoOpFilterValues.NamePattern, DbType.String, size: 256);
             parameters.Add("CreatedFrom", NoOpFilterValues.CreatedFrom, DbType.DateTime);
             parameters.Add("UpdatedBefore", NoOpFilterValues.UpdatedBefore, DbType.DateTime); // typed NULL
@@ -77,7 +77,7 @@ namespace KeyBasedAuthenticationTemplate_API.Repository.DapperDB
             // No-op demo parameters (see the "1 = 1 OR (...)" clause in the .sql file).
             command.Parameters.Add(new NpgsqlParameter("MinPrice", NpgsqlDbType.Numeric) { Value = NoOpFilterValues.MinPrice });
             command.Parameters.Add(new NpgsqlParameter("MinStock", NpgsqlDbType.Integer) { Value = NoOpFilterValues.MinStock });
-            command.Parameters.Add(new NpgsqlParameter("OwnerUserId", NpgsqlDbType.Uuid) { Value = NoOpFilterValues.OwnerUserId });
+            command.Parameters.Add(new NpgsqlParameter("OwnerUsername", NpgsqlDbType.Varchar) { Value = NoOpFilterValues.OwnerUsername });
             command.Parameters.Add(new NpgsqlParameter("NamePattern", NpgsqlDbType.Text) { Value = NoOpFilterValues.NamePattern });
             command.Parameters.Add(new NpgsqlParameter("CreatedFrom", NpgsqlDbType.TimestampTz) { Value = NoOpFilterValues.CreatedFrom });
             // Typed NULL: the value must be DBNull.Value, and NpgsqlDbType supplies the type.

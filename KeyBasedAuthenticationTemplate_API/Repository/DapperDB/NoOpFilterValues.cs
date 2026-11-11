@@ -7,11 +7,12 @@ namespace KeyBasedAuthenticationTemplate_API.Repository.DapperDB
     {
         public const decimal MinPrice = 0m;
         public const int MinStock = 0;
-        public static readonly Guid OwnerUserId = Guid.Empty;
+        public const string OwnerUsername = "";
+        public static readonly Guid ApiKeyId = Guid.Empty;
         public const string NamePattern = "%";
-        public const string EmailPattern = "%";
+        public const string OwnerUsernamePattern = "%";
         public const bool InStockOnly = true;
-        public const bool IsActive = true;
+        public const string KeyIdPattern = "%";
 
         // Explicit UTC kind: PostgreSQL timestamptz parameters reject DateTimeKind.Unspecified/Local.
         public static readonly DateTime CreatedFrom = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);

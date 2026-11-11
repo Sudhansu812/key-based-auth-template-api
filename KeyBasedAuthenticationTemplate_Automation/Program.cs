@@ -60,9 +60,9 @@ try
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<IExcelReportWriter, ClosedXmlReportWriter>();
     builder.Services.AddTransient<IReport, ProductsEfReport>();
-    builder.Services.AddTransient<IReport, UsersEfReport>();
+    builder.Services.AddTransient<IReport, ApiKeysEfReport>();
     builder.Services.AddTransient<IReport, ProductsDapperReport>();
-    builder.Services.AddTransient<IReport, UsersDapperReport>();
+    builder.Services.AddTransient<IReport, ApiKeysDapperReport>();
     builder.Services.AddTransient<ReportRunner>();
 
     using var host = builder.Build();
