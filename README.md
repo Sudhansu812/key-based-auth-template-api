@@ -234,7 +234,7 @@ To throw away all data and reload the dummy data from scratch (also required the
 dotnet run --project KeyBasedAuthenticationTemplate_API
 ```
 
-The script runs `dotnet ef database drop --force` for both contexts. The next Development start recreates the databases from the migrations and re-seeds everything above, including the `stg` staging table.
+The script runs `dotnet ef database drop --force` for both contexts. If the login isn't allowed to drop a database (for example a PostgreSQL role that doesn't own it), it falls back to `dotnet ef database update 0`, which reverts every migration and so drops the app's tables. The next Development start recreates the databases from the migrations and re-seeds everything above, including the `stg` staging table.
 
 ## Authentication guide
 

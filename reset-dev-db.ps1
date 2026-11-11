@@ -37,7 +37,13 @@ try {
     foreach ($context in 'AuthDbContext', 'AppDbContext') {
         Write-Host "Dropping database for $context..."
         dotnet ef database drop --context $context --force
-        if ($LASTEXITCODE -ne 0) { throw "dotnet ef database drop failed for $context." }
+        if ($LASTEXITCODE -eq 0) { continue }
+
+        # The login may be allowed to use the database but not drop it (e.g. a PostgreSQL role that
+        # does not own it). Fall back to reverting every migration, which drops the app's tables.
+        Write-Warning "Could not drop the database for $context; reverting all its migrations instead."
+        dotnet ef database update 0 --context $context
+        if ($LASTEXITCODE -ne 0) { throw "Could not reset the database for $context." }
     }
 }
 finally {
